@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uzum OMS — Admin Import v2</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary:#7000FF; --primary-dark:#5200bf; --bg:#f4f7fb; --card:#fff;
+      --text:#1f2937; --muted:#6b7280; --line:#e5e7eb; --green:#16a34a;
+      --red:#dc2626; --orange:#f59e0b; --blue:#2563eb; --radius:16px;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    .app { max-width:1180px; margin:0 auto; padding:28px 18px 40px; }
+    .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+    h1 { margin:0; font-size:28px; letter-spacing:-0.03em; }
+    .subtitle { margin-top:6px; color:var(--muted); font-size:14px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 12px; font-size:13px; color:var(--muted); }
+    .grid { display:grid; grid-template-columns: 360px 1fr; gap:18px; align-items:start; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 8px 24px rgba(15,23,42,.05); }
+    .card-h { padding:18px 18px 0; }
+    .card-h h2 { margin:0; font-size:17px; }
+    .card-b { padding:18px; }
+    .step { display:flex; gap:12px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line); }
+    .step:last-child { border-bottom:0; }
+    .num { width:28px; height:28px; border-radius:50%; background:#ede9fe; color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
+    .step-title { font-weight:800; font-size:14px; }
+    .step-text { color:var(--muted); font-size:13px; margin-top:3px; line-height:1.35; }
+    input[type="file"] { display:none; }
+    label, .label { font-size:12px; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:6px; }
+    input[type="text"], input[type="password"] { width:100%; padding:12px 13px; border:1.5px solid var(--line); border-radius:12px; font-size:14px; outline:none; background:#fff; }
+    input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(112,0,255,.08); }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .btn { width:100%; border:0; border-radius:12px; padding:13px 16px; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:.15s; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover:not(:disabled) { background:var(--primary-dark); }
+    .btn-secondary { background:#eef2ff; color:#3730a3; }
+    .btn-outline { background:#fff; color:var(--text); border:1px solid var(--line); }
+    .btn-danger { background:#fee2e2; color:#991b1b; }
+    .actions { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:12px; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+    .stat { background:#f8fafc; border:1px solid var(--line); border-radius:14px; padding:13px; }
+    .stat .k { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; }
+    .stat .v { font-size:28px; font-weight:900; margin-top:4px; letter-spacing:-.04em; }
+    .stat.ok .v { color:var(--green); } .stat.err .v { color:var(--red); } .stat.warn .v { color:var(--orange); }
+    .preview { overflow:auto; border:1px solid var(--line); border-radius:14px; max-height:430px; background:#fff; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { position:sticky; top:0; background:#f8fafc; color:#475569; text-align:left; padding:10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+    td { padding:9px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    tr.err td { background:#fff1f2; } tr.warn td { background:#fffbeb; }
+    .tag { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:12px; font-weight:800; }
+    .tag.ok { background:#dcfce7; color:#166534; } .tag.err { background:#fee2e2; color:#991b1b; } .tag.warn { background:#fef3c7; color:#92400e; } .tag.info { background:#dbeafe; color:#1e40af; }
+    .log { background:#0f172a; color:#bef264; padding:14px; border-radius:14px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; height:230px; overflow:auto; line-height:1.5; }
+    .help { background:#f8fafc; border:1px dashed #cbd5e1; color:#475569; padding:12px; border-radius:12px; font-size:13px; line-height:1.45; }
+    .hidden { display:none !important; }
+    .switch { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; }
+    .switch input { width:18px; height:18px; }
+    .filebox { border:2px dashed #c4b5fd; border-radius:16px; padding:18px; text-align:center; background:#faf5ff; cursor:pointer; }
+    .filebox strong { display:block; font-size:16px; margin-bottom:4px; }
+    .small { font-size:12px; color:var(--muted); }
+    @media (max-width: 900px) { .grid { grid-template-columns:1fr; } .stats { grid-template-columns:repeat(2,1fr); } .top { flex-direction:column; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div>
+      <h1>📦 Admin Import v2</h1>
+      <div class="subtitle">Загрузка Excel/CSV напрямую в SQL через безопасную RPC-функцию Supabase. Повторяет логику листа «Загрузка»: валидация, агрегация qty, upsert заказов и позиций.</div>
+    </div>
+    <div class="pill" id="sessionPill">🔒 Сессия не проверена</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-h"><h2>Управление импортом</h2></div>
+      <div class="card-b">
+        <div class="step">
+          <div class="num">1</div>
+          <div style="flex:1">
+            <div class="step-title">Подключение</div>
+            <div class="step-text">Используется publishable key. Для RLS лучше войти как администратор.</div>
+            <div class="row" style="margin-top:10px">
+              <div><label>Email</label><input id="email" type="text" placeholder="admin@company.com"></div>
+              <div><label>Пароль</label><input id="password" type="password" placeholder="••••••••"></div>
+            </div>
+            <button class="btn btn-outline" id="loginBtn" style="margin-top:10px">Войти в Supabase</button>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="num">2</div>
+          <div style="flex:1">
+            <div class="step-title">Файл заказов</div>
+            <div class="step-text">Поддерживаются .xlsx и .csv. Первый лист считается источником данных.</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+            <div class="filebox" id="fileDrop" style="margin-top:10px">
+              <strong>Выбрать файл</strong>
+              <span class="small" id="fileInfo">Файл не выбран</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="num">3</div>
+          <div style="flex:1">
+            <div class="step-title">Правила проверки</div>
+            <div class="switch"><span>Строгая проверка SKU по <b>sku_catalog</b></span><input id="strictSku" type="checkbox" checked></div>
+            <div class="switch"><span>Строгая проверка ПВЗ/филиала</span><input id="strictPvz" type="checkbox" checked></div>
+            <div class="small">Если включено — импорт остановится при неизвестном SKU или ПВЗ.</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-secondary" id="dryRunBtn" disabled>Проверить</button>
+          <button class="btn btn-primary" id="importBtn" disabled>Импортировать</button>
+        </div>
+        <button class="btn btn-danger" id="resetBtn" style="margin-top:10px">Сбросить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Предпросмотр и результат</h2></div>
+      <div class="card-b">
+        <div class="stats">
+          <div class="stat"><div class="k">Строк файла</div><div class="v" id="stRows">0</div></div>
+          <div class="stat"><div class="k">Заказов</div><div class="v" id="stOrders">0</div></div>
+          <div class="stat"><div class="k">Позиций</div><div class="v" id="stItems">0</div></div>
+          <div class="stat warn"><div class="k">Qty всего</div><div class="v" id="stQty">0</div></div>
+        </div>
+
+        <div class="help" id="helpBox">
+          Ожидаемые колонки: <b>ID</b>, <b>Дата создания</b>, <b>Телефон</b>, <b>Позиции</b>, <b>Цвет</b>, <b>Размер</b>, <b>SKU</b>, <b>Название филиала</b>, <b>Сайт</b>. Названия можно писать в разном регистре.
+        </div>
+
+        <div class="preview hidden" id="previewBox" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Статус</th><th>ID</th><th>SKU</th><th>Qty</th><th>Товар</th><th>ПВЗ/филиал</th><th>Строка</th></tr></thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:14px"><div class="label">Журнал</div><div class="log" id="log">Система готова...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CONFIG = {
+  S_URL: "https://ysvogudznyuszssdriih.supabase.co",
+  S_KEY: "sb_publishable_kU91fqnkt80hbLcVEms6oA_eXKVzY2A",
+  RPC_NAME: "import_orders_v2",
+  PREVIEW_LIMIT: 120,
+};
+
+const els = {
+  log: document.getElementById('log'), sessionPill: document.getElementById('sessionPill'),
+  email: document.getElementById('email'), password: document.getElementById('password'), loginBtn: document.getElementById('loginBtn'),
+  fileInput: document.getElementById('fileInput'), fileDrop: document.getElementById('fileDrop'), fileInfo: document.getElementById('fileInfo'),
+  strictSku: document.getElementById('strictSku'), strictPvz: document.getElementById('strictPvz'),
+  dryRunBtn: document.getElementById('dryRunBtn'), importBtn: document.getElementById('importBtn'), resetBtn: document.getElementById('resetBtn'),
+  stRows: document.getElementById('stRows'), stOrders: document.getElementById('stOrders'), stItems: document.getElementById('stItems'), stQty: document.getElementById('stQty'),
+  previewBox: document.getElementById('previewBox'), previewBody: document.getElementById('previewBody'), helpBox: document.getElementById('helpBox'),
+};
+
+let client = null;
+let selectedFile = null;
+let parsedRows = [];
+let aggregatedRows = [];
+let fileHash = null;
+let busy = false;
+
+const ALIASES = {
+  external_id: ['id', 'id заказа', 'номер заказа', 'заказ', 'order id', 'order_id', 'ID'],
+  order_date: ['дата создания', 'дата', 'created_at', 'date'],
+  phone: ['телефон', 'phone', 'номер телефона'],
+  item_name: ['позиции', 'товар', 'название', 'item', 'item_name'],
+  color: ['цвет', 'color'],
+  size: ['размер', 'size'],
+  sku: ['sku', 'артикул', 'штрихкод', 'barcode'],
+  branch_name: ['название филиала', 'филиал', 'пвз', 'адрес', 'branch', 'branch_name'],
+  site_source: ['сайт', 'site', 'source', 'site_source'],
+};
+
+function log(msg, type = 'info') {
+  const prefix = type === 'error' ? '❌' : type === 'ok' ? '✅' : type === 'warn' ? '⚠️' : '>';
+  els.log.innerHTML += `<br>${prefix} ${escapeHtml(msg)}`;
+  els.log.scrollTop = els.log.scrollHeight;
+}
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function normKey(s) { return String(s ?? '').trim().toLowerCase().replace(/ё/g,'е').replace(/[\s_\-]+/g,' '); }
+function cleanText(s) { const v = String(s ?? '').trim(); return v && v !== 'undefined' && v !== 'null' ? v : ''; }
+function cleanOrderId(v) { return cleanText(v).replace(/\.0$/, ''); }
+function cleanSku(v) { return cleanText(v).toUpperCase(); }
+function cleanPhone(v) { return cleanText(v).replace(/[^0-9+]/g, ''); }
+function setBusy(v) { busy = v; [els.loginBtn, els.dryRunBtn, els.importBtn, els.resetBtn].forEach(b => b.disabled = v || b.dataset.locked === '1'); }
+
+function initClient() {
+  if (!window.supabase) throw new Error('Supabase JS не загрузился');
+  client = window.supabase.createClient(CONFIG.S_URL, CONFIG.S_KEY);
+}
+
+async function checkSession() {
+  initClient();
+  const { data } = await client.auth.getSession();
+  if (data.session) {
+    els.sessionPill.textContent = `🔐 ${data.session.user.email || 'Supabase session'}`;
+    log('Сессия Supabase активна', 'ok');
+  } else {
+    els.sessionPill.textContent = '🔒 Можно работать без входа, если RLS разрешает RPC';
+  }
+}
+
+async function login() {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const email = els.email.value.trim();
+    const password = els.password.value;
+    if (!email || !password) throw new Error('Введите email и пароль');
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    els.sessionPill.textContent = `🔐 ${data.user.email}`;
+    log('Вход выполнен', 'ok');
+  } catch (e) { log(e.message, 'error'); }
+  finally { setBusy(false); updateButtons(); }
+}
+
+function findValue(row, field) {
+  const normalizedMap = {};
+  Object.keys(row).forEach(k => normalizedMap[normKey(k)] = row[k]);
+  for (const a of ALIASES[field] || []) {
+    const nk = normKey(a);
+    if (Object.prototype.hasOwnProperty.call(normalizedMap, nk)) return normalizedMap[nk];
+  }
+  return '';
+}
+
+async function sha256(file) {
+  const buf = await file.arrayBuffer();
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function parseDateValue(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date) return v.toISOString();
+  // XLSX serial date
+  if (typeof v === 'number' && v > 20000 && v < 80000) {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d, d.H || 0, d.M || 0, Math.floor(d.S || 0))).toISOString();
+  }
+  return String(v).trim();
+}
+
+async function handleFile(file) {
+  resetDataOnly();
+  selectedFile = file;
+  els.fileInfo.textContent = `Выбрано: ${file.name}`;
+  log(`Файл выбран: ${file.name}`);
+  fileHash = await sha256(file);
+  log(`SHA-256: ${fileHash.slice(0, 16)}...`);
+
+  const data = new Uint8Array(await file.arrayBuffer());
+  const wb = XLSX.read(data, { type: 'array', cellDates: true });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  log(`Прочитано строк из первого листа: ${rawRows.length}`);
+
+  parsedRows = rawRows.map((row, idx) => ({
+    row_no: idx + 2,
+    external_id: cleanOrderId(findValue(row, 'external_id')),
+    order_date: parseDateValue(findValue(row, 'order_date')),
+    phone: cleanPhone(findValue(row, 'phone')),
+    sku: cleanSku(findValue(row, 'sku')),
+    item_name: cleanText(findValue(row, 'item_name')),
+    color: cleanText(findValue(row, 'color')),
+    size: cleanText(findValue(row, 'size')),
+    branch_name: cleanText(findValue(row, 'branch_name')),
+    site_source: cleanText(findValue(row, 'site_source')),
+    raw: row,
+  })).filter(r => r.external_id || r.sku || r.phone || r.branch_name);
+
+  aggregatePreview();
+  renderPreview();
+  updateButtons();
+}
+
+function aggregatePreview() {
+  const map = new Map();
+  for (const r of parsedRows) {
+    if (!r.external_id && !r.sku) continue;
+    const key = `${r.external_id}|${r.sku}|${r.color}|${r.size}`;
+    if (!map.has(key)) map.set(key, { ...r, qty: 0, source_rows: [] });
+    const a = map.get(key);
+    a.qty += 1;
+    a.source_rows.push(r.row_no);
+    // Prefer non-empty values from later rows only when missing.
+    ['phone','order_date','item_name','branch_name','site_source'].forEach(f => { if (!a[f] && r[f]) a[f] = r[f]; });
+  }
+  aggregatedRows = [...map.values()];
+  const orders = new Set(parsedRows.map(r => r.external_id).filter(Boolean));
+  const qty = aggregatedRows.reduce((s, r) => s + r.qty, 0);
+  els.stRows.textContent = parsedRows.length;
+  els.stOrders.textContent = orders.size;
+  els.stItems.textContent = aggregatedRows.length;
+  els.stQty.textContent = qty;
+}
+
+function localIssues(r) {
+  const issues = [];
+  if (!r.external_id) issues.push('нет ID');
+  if (!r.sku) issues.push('нет SKU');
+  if (!r.branch_name) issues.push('нет ПВЗ');
+  return issues;
+}
+
+function renderPreview(serverErrors = []) {
+  const serverByRow = new Map(serverErrors.map(e => [String(e.row_no || ''), e]));
+  const rows = aggregatedRows.slice(0, CONFIG.PREVIEW_LIMIT);
+  els.previewBody.innerHTML = rows.map(r => {
+    const issues = localIssues(r);
+    const server = r.source_rows.map(n => serverByRow.get(String(n))).find(Boolean);
+    const allIssues = [...issues, ...((server?.errors) || [])];
+    const cls = allIssues.length ? 'err' : '';
+    const tag = allIssues.length ? `<span class="tag err">Ошибка</span>` : `<span class="tag ok">OK</span>`;
+    return `<tr class="${cls}">
+      <td>${tag}${allIssues.length ? `<div class="small">${escapeHtml(allIssues.join('; '))}</div>` : ''}</td>
+      <td><b>${escapeHtml(r.external_id)}</b></td>
+      <td><code>${escapeHtml(r.sku)}</code></td>
+      <td><b>${r.qty}</b></td>
+      <td>${escapeHtml(r.item_name || '—')}<div class="small">${escapeHtml([r.size, r.color].filter(Boolean).join(' · '))}</div></td>
+      <td>${escapeHtml(r.branch_name || '—')}</td>
+      <td>${escapeHtml(r.source_rows.join(', '))}</td>
+    </tr>`;
+  }).join('');
+  els.previewBox.classList.remove('hidden');
+  if (aggregatedRows.length > CONFIG.PREVIEW_LIMIT) log(`В предпросмотре показано ${CONFIG.PREVIEW_LIMIT} из ${aggregatedRows.length} агрегированных позиций`, 'warn');
+}
+
+function buildPayload() {
+  return {
+    file_name: selectedFile?.name || 'unknown',
+    file_hash: fileHash,
+    strict_sku: els.strictSku.checked,
+    strict_pvz: els.strictPvz.checked,
+    rows: parsedRows,
+  };
+}
+
+async function callImport(dryRun) {
+  if (busy) return;
+  if (!parsedRows.length) { log('Сначала выберите файл', 'warn'); return; }
+  setBusy(true);
+  try {
+    log(dryRun ? 'Запускаю проверку на сервере...' : 'Запускаю импорт в SQL...');
+    const { data, error } = await client.rpc(CONFIG.RPC_NAME, { p_payload: buildPayload(), p_dry_run: dryRun });
+    if (error) throw error;
+    if (!data) throw new Error('Пустой ответ RPC');
+
+    if (data.error_samples) renderPreview(data.error_samples);
+
+    if (!data.ok) {
+      log(data.message || 'Сервер вернул ошибки', 'error');
+      if (data.batch_id) log(`Batch ID: ${data.batch_id}`);
+      if (data.error_samples?.length) log(`Ошибок строк: ${data.error_rows}. Проверь таблицу предпросмотра.`, 'error');
+      return;
+    }
+
+    if (dryRun) {
+      log(`Проверка успешна. Batch: ${data.batch_id}`, 'ok');
+      log(`К импорту: заказов ${data.orders_total}, позиций ${data.items_total}, валидных строк ${data.valid_rows}`, 'ok');
+      els.importBtn.disabled = false;
+      els.importBtn.dataset.locked = '0';
+    } else {
+      log(`Импорт завершён. Batch: ${data.batch_id}`, 'ok');
+      log(`Заказы: +${data.orders_inserted}, обновлено ${data.orders_updated}. Позиции: +${data.items_inserted}, обновлено ${data.items_updated}`, 'ok');
+      els.importBtn.disabled = true;
+      els.importBtn.dataset.locked = '1';
+    }
+  } catch (e) {
+    log(e.message, 'error');
+  } finally {
+    setBusy(false);
+    updateButtons();
+  }
+}
+
+function updateButtons() {
+  const hasFile = parsedRows.length > 0;
+  els.dryRunBtn.disabled = busy || !hasFile;
+  if (!hasFile) els.importBtn.disabled = true;
+}
+
+function resetDataOnly() {
+  parsedRows = []; aggregatedRows = []; fileHash = null;
+  els.stRows.textContent = '0'; els.stOrders.textContent = '0'; els.stItems.textContent = '0'; els.stQty.textContent = '0';
+  els.previewBody.innerHTML = ''; els.previewBox.classList.add('hidden');
+  els.importBtn.dataset.locked = '0';
+}
+function resetAll() {
+  selectedFile = null; els.fileInput.value = ''; els.fileInfo.textContent = 'Файл не выбран';
+  resetDataOnly(); updateButtons(); log('Форма сброшена');
+}
+
+els.loginBtn.addEventListener('click', login);
+els.fileDrop.addEventListener('click', () => els.fileInput.click());
+els.fileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleFile(f).catch(err => log(err.message, 'error')); });
+els.dryRunBtn.addEventListener('click', () => callImport(true));
+els.importBtn.addEventListener('click', () => {
+  if (!confirm('Импортировать данные в SQL? После успешного импорта этот файл нельзя будет повторно загрузить с тем же хэшем.')) return;
+  callImport(false);
+});
+els.resetBtn.addEventListener('click', resetAll);
+
+checkSession().catch(err => log(err.message, 'error'));
+</script>
+</body>
+</html>

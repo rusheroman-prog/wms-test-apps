@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>ПВЗ Secure SQL — Visa Kapitalbank</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    :root {
+      --tg-bg:       var(--tg-theme-bg-color, #ffffff);
+      --tg-text:     var(--tg-theme-text-color, #000000);
+      --tg-hint:     var(--tg-theme-hint-color, #999999);
+      --tg-link:     var(--tg-theme-link-color, #2481cc);
+      --tg-btn:      var(--tg-theme-button-color, #2481cc);
+      --tg-btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --tg-second:   var(--tg-theme-secondary-bg-color, #f1f1f1);
+      --radius: 12px;
+      --green:  #34c759;
+      --red:    #ff3b30;
+      --orange: #ff9500;
+      --blue:   #007aff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--tg-bg);
+      color: var(--tg-text);
+      font-size: 16px;
+      min-height: 100vh;
+    }
+
+    /* ── Экраны ─────────────────────────────────────────────── */
+    .screen { display: none; flex-direction: column; min-height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Шапка ──────────────────────────────────────────────── */
+    .header {
+      background: var(--tg-btn);
+      color: var(--tg-btn-text);
+      padding: 14px 16px 12px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .header h1 { font-size: 17px; font-weight: 600; }
+    .header .sub { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+    .back-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .back-btn {
+      background: rgba(255,255,255,0.2); border: none;
+      color: white; border-radius: 8px; padding: 4px 10px;
+      font-size: 13px; cursor: pointer;
+    }
+
+    /* ── Контент ────────────────────────────────────────────── */
+    .content-old-replaced { flex: 1; padding: 16px; overflow-y: auto; }
+
+    /* ── Карточки меню ──────────────────────────────────────── */
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+    .menu-card {
+      background: var(--tg-second);
+      border-radius: var(--radius);
+      padding: 20px 14px;
+      text-align: center;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+    .menu-card:active { opacity: 0.7; }
+    .menu-card.accent { border-color: var(--tg-btn); }
+    .menu-card .icon  { font-size: 32px; margin-bottom: 8px; }
+    .menu-card .label { font-size: 14px; font-weight: 600; color: var(--tg-text); }
+    .menu-card .count { font-size: 12px; color: var(--tg-hint); margin-top: 4px; }
+
+    /* ── Форма ──────────────────────────────────────────────── */
+    .form-section { background: var(--tg-second); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+    .form-section h3 { font-size: 14px; font-weight: 600; color: var(--tg-hint); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+    .field-label { font-size: 13px; color: var(--tg-hint); margin-bottom: 4px; }
+    .field-input {
+      width: 100%; background: var(--tg-bg);
+      border: 1.5px solid rgba(0,0,0,0.1);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 17px; color: var(--tg-text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .field-input:focus { border-color: var(--tg-btn); }
+    .field-input.error { border-color: var(--red); }
+    .field-input.success { border-color: var(--green); }
+
+    /* ── Кнопки ─────────────────────────────────────────────── */
+    .btn {
+      width: 100%; padding: 14px;
+      background: var(--tg-btn); color: var(--tg-btn-text);
+      border: none; border-radius: var(--radius);
+      font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+    }
+    .btn:active { opacity: 0.8; }
+    .btn.secondary { background: var(--tg-second); color: var(--tg-text); }
+    .btn.danger    { background: var(--red); color: white; }
+    .btn.success   { background: var(--green); color: white; }
+    .btn:disabled  { opacity: 0.4; cursor: default; }
+
+    /* ── Статус-карточка ────────────────────────────────────── */
+    .result-card {
+      border-radius: var(--radius); padding: 16px;
+      margin: 12px 0; display: none;
+    }
+    .result-card.visible { display: block; }
+    .result-card.ok   { background: #e8f5e9; border: 1.5px solid var(--green); }
+    .result-card.err  { background: #fce8e8; border: 1.5px solid var(--red); }
+    .result-card.info { background: #e3f2fd; border: 1.5px solid var(--blue); }
+    .result-card .rc-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .result-card .rc-body  { font-size: 14px; color: #555; }
+
+    /* ── Скан-секция ────────────────────────────────────────── */
+    .scan-wrap {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 12px;
+      /* Высота = 56% ширины экрана — оптимально для портретного режима */
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: 56vw;
+    }
+    .scan-wrap video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .scan-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .scan-frame {
+      width: min(55vw, 180px);
+      height: min(55vw, 180px);
+      border: 3px solid rgba(255,255,255,0.9);
+      border-radius: 14px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+      position: relative;
+      overflow: hidden;
+    }
+    /* Лазерная полоска — показывает что камера активна и сканирует */
+    .scan-frame::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: scanLaser 2s infinite linear alternate;
+    }
+    @keyframes scanLaser {
+      0%   { transform: translateY(0); }
+      100% { transform: translateY(min(55vw, 180px)); }
+    }
+    .scan-hint {
+      text-align: center; font-size: 13px;
+      color: var(--tg-hint); margin-bottom: 8px;
+    }
+
+    /* ── Адаптивные отступы контента ───────────────────────── */
+    .content {
+      flex: 1; overflow-y: auto;
+      padding: clamp(10px, 3vw, 20px);
+      /* Запрещаем контенту вылезать за экран */
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    /* ── Кнопки — минимальная высота для пальца ─────────────── */
+    .btn { min-height: 48px; }
+    .field-input { min-height: 48px; }
+
+    /* ── Форма — не выходит за экран ───────────────────────── */
+    .form-section {
+      background: var(--tg-second);
+      border-radius: var(--radius);
+      padding: clamp(12px, 3vw, 20px);
+      margin-bottom: 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* ── Строка ввода + кнопка камеры — не обрезается ──────── */
+    .input-camera-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+      width: 100%;
+    }
+    .input-camera-row .field-input { flex: 1; min-width: 0; }
+    .input-camera-row .cam-btn {
+      flex-shrink: 0;
+      width: 48px; height: 48px;
+      background: var(--tg-btn); color: white;
+      border: none; border-radius: 10px;
+      font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .input-camera-row .cam-btn:active { opacity: 0.8; }
+
+    /* ── Список заказов ─────────────────────────────────────── */
+    /* ── Заказы ─────────────────────────────────────────────── */
+    .search-row { padding: 0 4px 12px; }
+
+    .cell-badge {
+      display: inline-block;
+      background: rgba(0,122,255,0.1);
+      color: var(--blue);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 4px;
+      border: 1px solid rgba(0,122,255,0.2);
+    }
+
+    .order-item {
+      background: var(--tg-second);
+      border-radius: var(--radius); padding: 12px 14px;
+      margin-bottom: 8px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: stretch;
+      transition: all 0.2s;
+    }
+    .order-item:active { opacity: 0.7; }
+    .order-item-header { display: flex; align-items: center; gap: 12px; width: 100%; }
+    .order-status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .order-info { flex: 1; }
+    .order-id   { font-weight: 600; font-size: 15px; }
+    .order-meta { font-size: 13px; color: var(--tg-hint); margin-top: 2px; }
+
+    .order-actions {
+      display: none;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(0,0,0,0.1);
+    }
+    .order-item.expanded .order-actions { display: flex; }
+
+    .action-btn {
+      flex: 1; padding: 10px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+    }
+    .action-btn.issue  { background: var(--green); color: white; }
+    .action-btn.return { background: #ffebee; color: var(--red); }
+
+    /* ── Отчёт ──────────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stat-card { background: var(--tg-second); border-radius: 10px; padding: 14px; text-align: center; }
+    .stat-num  { font-size: 28px; font-weight: 700; }
+    .stat-lbl  { font-size: 12px; color: var(--tg-hint); margin-top: 2px; }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+    .filter-btn {
+      white-space: nowrap; padding: 6px 14px;
+      border-radius: 20px; border: 1.5px solid var(--tg-btn);
+      background: transparent; color: var(--tg-btn);
+      font-size: 13px; cursor: pointer;
+    }
+    .filter-btn.active { background: var(--tg-btn); color: white; }
+
+    .report-row {
+      background: var(--tg-second); border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .report-row .rr-order { font-weight: 600; font-size: 14px; }
+    .report-row .rr-meta  { color: var(--tg-hint); margin-top: 2px; }
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; margin-left: 6px;
+    }
+    .badge-received { background: #fff3cd; color: #856404; }
+    .badge-issued   { background: #d4edda; color: #155724; }
+    .badge-returned { background: #f8d7da; color: #721c24; }
+    .badge-waiting  { background: #e2e3e5; color: #383d41; }
+
+    /* ── Выбор ПВЗ (онбординг) ─────────────────────────────── */
+    .pvz-list { max-height: 60vh; overflow-y: auto; }
+    .pvz-item {
+      padding: 14px 16px; border-bottom: 1px solid rgba(0,0,0,0.06);
+      cursor: pointer; font-size: 16px;
+    }
+    .pvz-item:active { background: var(--tg-second); }
+
+    /* ── Лоадер ─────────────────────────────────────────────── */
+    .loader { text-align: center; padding: 40px; color: var(--tg-hint); }
+    .spinner {
+      width: 32px; height: 32px; margin: 0 auto 12px;
+      border: 3px solid var(--tg-second);
+      border-top-color: var(--tg-btn);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Разворот причины ───────────────────────────────────── */
+    .reason-list { display: flex; flex-direction: column; gap: 8px; }
+    .reason-btn {
+      padding: 12px 14px; background: var(--tg-second);
+      border: 2px solid transparent; border-radius: 10px;
+      text-align: left; font-size: 15px; cursor: pointer;
+    }
+    .reason-btn.selected { border-color: var(--tg-btn); background: rgba(0,120,255,0.06); }
+    .reason-btn:active { opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ ОНБОРДИНГ ═══════════════ -->
+<div id="screen-onboard" class="screen active">
+  <div class="header"><h1>📦 ПВЗ — Первый вход</h1></div>
+  <div class="content">
+    <div class="form-section">
+      <h3>Добро пожаловать</h3>
+      <p style="font-size:14px;color:var(--tg-hint);margin-bottom:16px">
+        Выберите ваш пункт выдачи. Выбор сохранится автоматически.
+      </p>
+      <div class="field-label">Поиск ПВЗ</div>
+      <input type="text" class="field-input" id="pvzSearch" placeholder="Например: ТАШ-123"
+             oninput="filterPvzList(this.value)" style="margin-bottom:12px">
+    </div>
+    <div class="pvz-list" id="pvzList">
+      <div class="loader"><div class="spinner"></div>Загрузка...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ГЛАВНОЕ МЕНЮ ═══════════════ -->
+<div id="screen-main" class="screen">
+  <div class="header">
+    <h1 id="mainTitle">ПВЗ</h1>
+    <div class="sub" id="mainSub"></div>
+  </div>
+  <div class="content">
+    <div class="menu-grid">
+      <div class="menu-card accent" onclick="goTo('reception')">
+        <div class="icon">📥</div>
+        <div class="label">Приёмка</div>
+        <div class="count" id="cntWaiting">—</div>
+      </div>
+      <div class="menu-card" onclick="goTo('issuance')">
+        <div class="icon">📤</div>
+        <div class="label">Выдача</div>
+        <div class="count" id="cntReady">—</div>
+      </div>
+      <div class="menu-card" onclick="goTo('return')">
+        <div class="icon">↩️</div>
+        <div class="label">Возврат</div>
+        <div class="count"></div>
+      </div>
+      <div class="menu-card" onclick="goTo('orders')">
+        <div class="icon">📋</div>
+        <div class="label">Заказы</div>
+        <div class="count" id="cntOrders">—</div>
+      </div>
+    </div>
+    <div id="reportMenuCard" style="display:none;margin-top:12px">
+      <div class="menu-card" onclick="goTo('report')" style="grid-column:1/-1">
+        <div class="icon">📊</div>
+        <div class="label">Отчёт ТУ/РУ</div>
+      </div>
+    </div>
+    <div style="margin-top:20px;text-align:center">
+      <button class="btn secondary" style="width:auto;padding:8px 20px;font-size:13px"
+              onclick="changePvz()">Сменить ПВЗ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ПРИЁМКА ═══════════════ -->
+<div id="screen-reception" class="screen">
+  <div class="header">
+    <div class="back-row">
+      <button class="back-btn" onclick="goTo('main')">← Назад</button>
+    </div>
+    <h1>📥 Приёмка</h1>
+  </div>
+  <div class="content">
+    <div class="form-section">
+      <h3>Шаг 1 — Номер заказа</h3>
+      <div class="scan-hint">Наведите камеру на QR-код этикетки или введите вручную</div>
+      <div class="scan-wrap" id="recScanWrap" style="display:none">
+        <video id="recVideo" playsinline></video>
+        <div class="scan-overlay"><div class="scan-frame"></div></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="field-input" id="recOrderInput" placeholder="Номер заказа" inputmode="numeric"
+               onkeypress="if(event.key==='Enter')checkReception()">
+        <button class="btn" style="width:auto;margin:0;padding:0 16px"
+                onclick="toggleCamera('rec')">📷</button>
+      </div>
+      <button class="btn" onclick="checkReception()" style="margin-top:8px">Проверить</button>
+    </div>
+
+    <div class="result-card" id="recResult"></div>
+
+    <div id="recCellSection" style="display:none">
+      <div class="form-section">
+        <h3>Шаг 2 — Ячейка хранения</h3>
+        <div class="field-label">Куда положить товар?</div>
+        <input type="text" class="field-input" id="recCellInput" placeholder="Например: А-12"
+               onkeypress="if(event.key==='Enter')saveReception()">
+        <button class="btn success" onclick="saveReception()" style="margin-top:8px">
+          ✅ Принять и сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ВЫДАЧА ═══════════════ -->
+<div id="screen-issuance" class="screen">
+  <div class="header">
+    <div class="back-row"><button class="back-btn" onclick="goTo('main')">← Назад</button></div>
+    <h1>📤 Выдача</h1>
+  </div>
+  <div class="content">
+    <div class="form-section">
+      <h3>Номер заказа клиента</h3>
+      <div class="scan-wrap" id="issScanWrap" style="display:none">
+        <video id="issVideo" playsinline></video>
+        <div class="scan-overlay"><div class="scan-frame"></div></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="field-input" id="issOrderInput" placeholder="Номер заказа" inputmode="numeric"
+               onkeypress="if(event.key==='Enter')findIssuance()">
+        <button class="btn" style="width:auto;margin:0;padding:0 16px"
+                onclick="toggleCamera('iss')">📷</button>
+      </div>
+      <button class="btn" onclick="findIssuance()" style="margin-top:8px">Найти заказ</button>
+    </div>
+
+    <div class="result-card" id="issResult"></div>
+
+    <div id="issConfirmSection" style="display:none">
+      <div class="form-section">
+        <h3>Подтверждение выдачи</h3>
+        <div style="font-size:22px;font-weight:700;color:var(--blue);text-align:center;padding:12px 0"
+             id="issCellDisplay"></div>
+        <p style="text-align:center;font-size:14px;color:var(--tg-hint);margin-bottom:8px">
+          Возьмите товар с этой ячейки и выдайте клиенту
+        </p>
+        <button class="btn success" onclick="saveIssuance()">✅ Подтвердить выдачу</button>
+        <button class="btn secondary" onclick="resetIssuance()" style="margin-top:8px">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ВОЗВРАТ ═══════════════ -->
+<div id="screen-return" class="screen">
+  <div class="header">
+    <div class="back-row"><button class="back-btn" onclick="goTo('main')">← Назад</button></div>
+    <h1>↩️ Возврат</h1>
+  </div>
+  <div class="content">
+    <div class="form-section">
+      <h3>Номер заказа</h3>
+      <div class="scan-wrap" id="retScanWrap" style="display:none">
+        <video id="retVideo" playsinline></video>
+        <div class="scan-overlay"><div class="scan-frame"></div></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="field-input" id="retOrderInput" placeholder="Номер заказа" inputmode="numeric"
+               onkeypress="if(event.key==='Enter')checkReturn()">
+        <button class="btn" style="width:auto;margin:0;padding:0 16px"
+                onclick="toggleCamera('ret')">📷</button>
+      </div>
+      <button class="btn" onclick="checkReturn()" style="margin-top:8px">Проверить</button>
+    </div>
+
+    <div class="result-card" id="retResult"></div>
+
+    <div id="retReasonSection" style="display:none">
+      <div class="form-section">
+        <h3>Причина возврата</h3>
+        <div class="reason-list">
+          <button class="reason-btn" onclick="selectReason(this,'Клиент не явился')">Клиент не явился</button>
+          <button class="reason-btn" onclick="selectReason(this,'Клиент отказался')">Клиент отказался</button>
+          <button class="reason-btn" onclick="selectReason(this,'Повреждён товар')">Повреждён товар</button>
+          <button class="reason-btn" onclick="selectReason(this,'Ошибка адреса')">Ошибка адреса</button>
+        </div>
+        <input type="text" class="field-input" id="retCustomReason"
+               placeholder="Другая причина..." style="margin-top:8px"
+               oninput="clearSelectedReasons()">
+        <button class="btn danger" onclick="saveReturn()" style="margin-top:12px">
+          ↩️ Оформить возврат
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ЗАКАЗЫ ═══════════════ -->
+<div id="screen-orders" class="screen">
+  <div class="header">
+    <div class="back-row"><button class="back-btn" onclick="goTo('main')">← Назад</button></div>
+    <h1>📋 Мои заказы</h1>
+  </div>
+  <div class="content">
+    <div class="search-row">
+      <input type="text" class="field-input" id="orderSearchInput"
+             placeholder="Поиск по номеру заказа или телефону..."
+             oninput="applyOrderFilters()" inputmode="search">
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setOrderTab('all', this)">Все</button>
+      <button class="filter-btn" onclick="setOrderTab('waiting', this)">Ожидают</button>
+      <button class="filter-btn" onclick="setOrderTab('stored', this)">На хранении</button>
+      <button class="filter-btn" onclick="setOrderTab('issued', this)">Выданы</button>
+    </div>
+    <div id="ordersList"><div class="loader"><div class="spinner"></div>Загрузка...</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ОТЧЁТ ТУ/РУ ═══════════════ -->
+<div id="screen-report" class="screen">
+  <div class="header">
+    <div class="back-row"><button class="back-btn" onclick="goTo('main')">← Назад</button></div>
+    <h1>📊 Отчёт ТУ/РУ</h1>
+  </div>
+  <div class="content">
+    <div class="stat-grid" id="reportStats"></div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="filterReport('all',this)">Все</button>
+      <button class="filter-btn" onclick="filterReport('waiting',this)">Ожидают</button>
+      <button class="filter-btn" onclick="filterReport('received',this)">Приняты</button>
+      <button class="filter-btn" onclick="filterReport('issued',this)">Выданы</button>
+      <button class="filter-btn" onclick="filterReport('returned',this)">Возврат</button>
+    </div>
+    <div id="reportList"><div class="loader"><div class="spinner"></div>Загрузка...</div></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// КОНФИГ — SECURE EDGE API
+// ══════════════════════════════════════════
+const SUPABASE_URL = "https://ysvogudznyuszssdriih.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_kU91fqnkt80hbLcVEms6oA_eXKVzY2A";
+const PVZ_API_URL = `${SUPABASE_URL}/functions/v1/pvz-api`;
+
+// Для локального теста в обычном браузере можно временно поставить true,
+// но в бою должно быть false: нужен Telegram.WebApp.initData.
+const DEV_ALLOW_BROWSER_TEST = false;
+
+// ══════════════════════════════════════════
+// СОСТОЯНИЕ
+// ══════════════════════════════════════════
+const tg = window.Telegram.WebApp;
+tg.expand();
+tg.ready();
+
+const state = {
+  tgId:      String(tg.initDataUnsafe?.user?.id || ""),
+  name:      tg.initDataUnsafe?.user?.first_name || "Оператор",
+  pvzCode:   localStorage.getItem("pvz_code") || "",
+  role:      localStorage.getItem("pvz_role") || "Оператор",
+  allPvz:    [],
+  allOrders: [],
+  recRow:    null,
+  issRow:    null,
+  retRow:    null,
+  selectedReason: "",
+  cameras:   { rec: null, iss: null, ret: null },
+  // [FIX-3] RAF IDs для явной отмены анимации при остановке камеры
+  rafIds:    { rec: null, iss: null, ret: null },
+};
+
+// ══════════════════════════════════════════
+// ИНИЦИАЛИЗАЦИЯ
+// ══════════════════════════════════════════
+async function init() {
+  // Проверяем авторизацию
+  const auth = await api("check_auth");
+  if (auth.registered) {
+    state.pvzCode = auth.operator.pvzCode;
+    state.role    = auth.operator.role;
+    localStorage.setItem("pvz_code", state.pvzCode);
+    localStorage.setItem("pvz_role",  state.role);
+    showMain();
+  } else if (state.pvzCode) {
+    // Уже выбирал ПВЗ ранее
+    await registerAndGo(state.pvzCode);
+  } else {
+    showOnboard();
+  }
+}
+
+async function showOnboard() {
+  goTo("onboard");
+  const pvzList = await api("get_pvz_list");
+  state.allPvz  = pvzList || [];
+  renderPvzList(state.allPvz);
+}
+
+// [FIX-5] Debounce: не перерисовываем список на каждое нажатие клавиши
+let pvzDebounceTimer = null;
+function filterPvzList(q) {
+  clearTimeout(pvzDebounceTimer);
+  pvzDebounceTimer = setTimeout(() => {
+    const filtered = state.allPvz.filter(p => p.toLowerCase().includes(q.toLowerCase()));
+    renderPvzList(filtered);
+  }, 250);
+}
+
+function renderPvzList(list) {
+  const el = document.getElementById("pvzList");
+  if (!list.length) { el.innerHTML = '<div class="loader">Не найдено</div>'; return; }
+  // [FIX-4] Экранируем значения ПВЗ
+  el.innerHTML = list.map(pvz =>
+    `<div class="pvz-item" onclick="registerAndGo('${esc(pvz)}')">${esc(pvz)}</div>`
+  ).join('');
+}
+
+async function registerAndGo(pvzCode) {
+  state.pvzCode = pvzCode;
+  const res = await api("register", { name: state.name, pvz_code: pvzCode });
+  if (res.role) state.role = res.role;
+  localStorage.setItem("pvz_code", pvzCode);
+  localStorage.setItem("pvz_role",  state.role);
+  showMain();
+}
+
+function changePvz() {
+  localStorage.removeItem("pvz_code");
+  showOnboard();
+}
+
+async function showMain() {
+  goTo("main");
+  document.getElementById("mainTitle").textContent = state.pvzCode || "ПВЗ";
+  document.getElementById("mainSub").textContent   = state.name + " · " + state.role;
+
+  // Показать кнопку отчёта ТУ/РУ
+  if (["ТУ","РУ","Администратор"].includes(state.role)) {
+    document.getElementById("reportMenuCard").style.display = "block";
+  }
+
+  // Загрузить счётчики
+  loadCounts();
+}
+
+async function loadCounts() {
+  const res = await api("get_my_orders");
+  if (!res.orders) return;
+  state.allOrders = res.orders;
+
+  const waiting = res.orders.filter(o => o.status === "Ожидает приёмки").length;
+  const stored  = res.orders.filter(o => o.status === "На хранении").length;
+
+  document.getElementById("cntWaiting").textContent = waiting + " ожид.";
+  document.getElementById("cntReady").textContent   = stored  + " готов.";
+  document.getElementById("cntOrders").textContent  = res.orders.length + " всего";
+}
+
+// ══════════════════════════════════════════
+// НАВИГАЦИЯ
+// ══════════════════════════════════════════
+function goTo(name) {
+  // Лёгкая вибрация при навигации — интерфейс ощущается живым
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+
+  stopAllCameras();
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+
+  if (name === "orders") loadOrders();
+  if (name === "report") loadReport("all");
+
+  // Автофокус для аппаратных сканеров (Bluetooth/USB) — эмулируют клавиатуру
+  // Небольшая задержка нужна чтобы экран успел отрисоваться
+  setTimeout(() => {
+    if (name === "reception") document.getElementById("recOrderInput")?.focus();
+    if (name === "issuance")  document.getElementById("issOrderInput")?.focus();
+    if (name === "return")    document.getElementById("retOrderInput")?.focus();
+  }, 100);
+}
+
+// ══════════════════════════════════════════
+// КАМЕРА (jsQR)
+// ══════════════════════════════════════════
+function toggleCamera(prefix) {
+  const wrap  = document.getElementById(prefix + "ScanWrap");
+  const video = document.getElementById(prefix + "Video");
+  const input = document.getElementById(prefix + "OrderInput");
+
+  if (state.cameras[prefix]) {
+    stopCamera(prefix);
+    return;
+  }
+
+  wrap.style.display = "block";
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      video.srcObject = stream;
+      video.play();
+      state.cameras[prefix] = stream;
+      scanLoop(prefix, video, input);
+    })
+    .catch(() => {
+      wrap.style.display = "none";
+      tg.showAlert("Нет доступа к камере. Введите номер вручную.");
+    });
+}
+
+function scanLoop(prefix, video, input) {
+  if (!state.cameras[prefix]) return;
+  const canvas = document.createElement("canvas");
+  const ctx    = canvas.getContext("2d");
+
+  // Троттлинг: jsQR запускается не чаще 4 раз/сек (каждые 250 мс)
+  // Без этого — нагрев телефона и зависание кнопок на бюджетных устройствах
+  let lastScanTime = 0;
+
+  function tick(now) {
+    if (!state.cameras[prefix]) return;
+
+    // Планируем следующий кадр сразу — RAF продолжает работать
+    state.rafIds[prefix] = requestAnimationFrame(tick);
+
+    // Пропускаем кадр если прошло меньше 250 мс с последнего скана
+    if (now - lastScanTime < 250) return;
+    lastScanTime = now;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+      if (code && code.data) {
+        input.value = code.data.trim();
+        stopCamera(prefix);
+        tg.HapticFeedback.impactOccurred("medium");
+        if (prefix === "rec") checkReception();
+        if (prefix === "iss") findIssuance();
+        if (prefix === "ret") checkReturn();
+      }
+    }
+  }
+  state.rafIds[prefix] = requestAnimationFrame(tick);
+}
+
+function stopCamera(prefix) {
+  if (state.rafIds[prefix]) {
+    cancelAnimationFrame(state.rafIds[prefix]);
+    state.rafIds[prefix] = null;
+  }
+  if (state.cameras[prefix]) {
+    state.cameras[prefix].getTracks().forEach(t => t.stop());
+    state.cameras[prefix] = null;
+    // Очищаем srcObject — iOS WebKit иначе держит последний кадр в памяти
+    const vid = document.getElementById(prefix + "Video");
+    if (vid) vid.srcObject = null;
+  }
+  const wrap = document.getElementById(prefix + "ScanWrap");
+  if (wrap) wrap.style.display = "none";
+}
+
+function stopAllCameras() {
+  ["rec","iss","ret"].forEach(stopCamera);
+}
+
+// ══════════════════════════════════════════
+// ПРИЁМКА
+// ══════════════════════════════════════════
+async function checkReception() {
+  const orderId = document.getElementById("recOrderInput").value.trim();
+  if (!orderId) { showResult("recResult","err","Введите номер заказа",""); return; }
+
+  showResult("recResult","info","Проверка...","");
+  const res = await api("check_reception", { order_id: orderId });
+
+  if (!res.found) {
+    showResult("recResult","err","❌ " + res.msg, "");
+    document.getElementById("recCellSection").style.display = "none";
+    state.recRow = null;
+    return;
+  }
+
+  state.recRow = res.row;
+  showResult("recResult","ok",
+    "✅ Заказ найден",
+    "ПВЗ: " + res.pvz + " · Позиций: " + res.plan + " · Телефон: " + res.phone
+  );
+  document.getElementById("recCellSection").style.display = "block";
+  document.getElementById("recCellInput").focus();
+}
+
+async function saveReception() {
+  const cell = document.getElementById("recCellInput").value.trim();
+  const orderId = document.getElementById("recOrderInput").value.trim();
+  if (!cell) { tg.showAlert("Укажите ячейку хранения"); return; }
+
+  const res = await api("save_reception", { order_id: orderId, cell });
+  if (res.success) {
+    tg.HapticFeedback.notificationOccurred("success");
+    showResult("recResult","ok","✅ " + res.msg, "");
+    document.getElementById("recCellSection").style.display = "none";
+    document.getElementById("recOrderInput").value = "";
+    document.getElementById("recCellInput").value  = "";
+    state.recRow = null;
+    loadCounts();
+  } else {
+    showResult("recResult","err","❌ " + res.msg, "");
+  }
+}
+
+// ══════════════════════════════════════════
+// ВЫДАЧА
+// ══════════════════════════════════════════
+async function findIssuance() {
+  const orderId = document.getElementById("issOrderInput").value.trim();
+  if (!orderId) { showResult("issResult","err","Введите номер заказа",""); return; }
+
+  showResult("issResult","info","Поиск...","");
+  const res = await api("find_issuance", { order_id: orderId });
+
+  if (!res.found) {
+    showResult("issResult","err","❌ " + res.msg, "");
+    document.getElementById("issConfirmSection").style.display = "none";
+    return;
+  }
+
+  state.issRow = res.row;
+  document.getElementById("issCellDisplay").textContent = "Ячейка: " + res.cell;
+  showResult("issResult","ok","✅ Заказ найден · " + res.phone, "");
+  document.getElementById("issConfirmSection").style.display = "block";
+  tg.HapticFeedback.impactOccurred("light");
+}
+
+async function saveIssuance() {
+  const orderId = document.getElementById("issOrderInput").value.trim();
+  const res = await api("save_issuance", { order_id: orderId, row: state.issRow });
+
+  if (res.success) {
+    tg.HapticFeedback.notificationOccurred("success");
+    showResult("issResult","ok","✅ " + res.msg, "");
+    document.getElementById("issConfirmSection").style.display = "none";
+    document.getElementById("issOrderInput").value = "";
+    state.issRow = null;
+    loadCounts();
+  } else {
+    showResult("issResult","err","❌ " + res.msg, "");
+  }
+}
+
+function resetIssuance() {
+  document.getElementById("issConfirmSection").style.display = "none";
+  document.getElementById("issOrderInput").value = "";
+  document.getElementById("issResult").classList.remove("visible");
+  state.issRow = null;
+}
+
+// ══════════════════════════════════════════
+// ВОЗВРАТ
+// ══════════════════════════════════════════
+async function checkReturn() {
+  const orderId = document.getElementById("retOrderInput").value.trim();
+  if (!orderId) { showResult("retResult","err","Введите номер заказа",""); return; }
+
+  showResult("retResult","info","Проверка...","");
+  const res = await api("check_return", { order_id: orderId });
+
+  if (!res.found) {
+    showResult("retResult","err","❌ " + res.msg, "");
+    document.getElementById("retReasonSection").style.display = "none";
+    return;
+  }
+
+  state.retRow = res.row;
+  showResult("retResult","ok","✅ Заказ найден · " + res.phone, "");
+  document.getElementById("retReasonSection").style.display = "block";
+}
+
+function selectReason(btn, reason) {
+  document.querySelectorAll(".reason-btn").forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+  state.selectedReason = reason;
+  document.getElementById("retCustomReason").value = "";
+}
+
+// Сброс выбранных кнопок когда оператор начинает вводить свою причину
+function clearSelectedReasons() {
+  document.querySelectorAll(".reason-btn").forEach(b => b.classList.remove("selected"));
+  state.selectedReason = "";
+}
+
+async function saveReturn() {
+  const orderId = document.getElementById("retOrderInput").value.trim();
+  const custom  = document.getElementById("retCustomReason").value.trim();
+  const reason  = custom || state.selectedReason;
+
+  if (!reason) { tg.showAlert("Выберите или введите причину возврата"); return; }
+
+  const res = await api("save_return", { order_id: orderId, reason, row: state.retRow });
+  if (res.success) {
+    tg.HapticFeedback.notificationOccurred("success");
+    showResult("retResult","ok","✅ " + res.msg, "");
+    document.getElementById("retReasonSection").style.display = "none";
+    document.getElementById("retOrderInput").value = "";
+    document.querySelectorAll(".reason-btn").forEach(b => b.classList.remove("selected"));
+    state.selectedReason = "";
+    state.retRow = null;
+    loadCounts();
+  } else {
+    showResult("retResult","err","❌ " + res.msg, "");
+  }
+}
+
+// ══════════════════════════════════════════
+// СПИСОК ЗАКАЗОВ
+// ══════════════════════════════════════════
+let currentOrderTab = 'all';
+
+async function loadOrders() {
+  document.getElementById("ordersList").innerHTML =
+    '<div class="loader"><div class="spinner"></div>Загрузка...</div>';
+  document.getElementById("orderSearchInput").value = "";
+  const res = await api("get_my_orders");
+  state.allOrders = res.orders || [];
+  applyOrderFilters();
+}
+
+function setOrderTab(filter, btn) {
+  document.querySelectorAll("#screen-orders .filter-row .filter-btn")
+    .forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentOrderTab = filter;
+  applyOrderFilters();
+}
+
+// Комбинированная фильтрация: таб + поиск по ID или телефону
+function applyOrderFilters() {
+  const query = document.getElementById("orderSearchInput").value.toLowerCase().trim();
+  let filtered = state.allOrders;
+
+  if (currentOrderTab === "waiting") filtered = filtered.filter(o => o.status === "Ожидает приёмки");
+  if (currentOrderTab === "stored")  filtered = filtered.filter(o => o.status === "На хранении");
+  if (currentOrderTab === "issued")  filtered = filtered.filter(o => o.status === "Выдан");
+
+  if (query) {
+    filtered = filtered.filter(o =>
+      (o.orderId && String(o.orderId).toLowerCase().includes(query)) ||
+      (o.phone   && String(o.phone).toLowerCase().includes(query))
+    );
+  }
+
+  renderOrders(filtered);
+}
+
+// Аккордеон: разворачивает карточку, закрывает остальные
+function toggleOrderDetails(element) {
+  if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+  document.querySelectorAll(".order-item.expanded").forEach(el => {
+    if (el !== element) el.classList.remove("expanded");
+  });
+  element.classList.toggle("expanded");
+}
+
+// Быстрый переход на выдачу или возврат с подставленным номером
+function quickAction(action, orderId, event) {
+  event.stopPropagation();
+  goTo(action);
+  setTimeout(() => {
+    if (action === "issuance") {
+      document.getElementById("issOrderInput").value = orderId;
+      findIssuance();
+    } else if (action === "return") {
+      document.getElementById("retOrderInput").value = orderId;
+      checkReturn();
+    }
+  }, 200);
+}
+
+const STATUS_DOT = {
+  "Ожидает приёмки": "#999999",
+  "На хранении":     "#ff9500",
+  "Выдан":           "#34c759",
+  "Возврат":         "#ff3b30",
+};
+
+function renderOrders(orders) {
+  const el = document.getElementById("ordersList");
+  if (!orders.length) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--tg-hint)">
+        <div style="font-size:40px;margin-bottom:12px">📭</div>
+        <div style="font-size:15px;font-weight:500">Ничего не найдено</div>
+        <div style="font-size:13px;margin-top:6px">Попробуйте изменить поиск или фильтр</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = orders.map(o => {
+    const isStored  = o.status === "На хранении";
+    const actionsHtml = isStored ? `
+      <div class="order-actions">
+        <button class="action-btn issue"
+                onclick="quickAction('issuance','${esc(o.orderId)}',event)">📤 Выдать</button>
+        <button class="action-btn return"
+                onclick="quickAction('return','${esc(o.orderId)}',event)">↩️ Возврат</button>
+      </div>` : '';
+
+    return `
+      <div class="order-item" onclick="toggleOrderDetails(this)">
+        <div class="order-item-header">
+          <div class="order-status-dot" style="background:${STATUS_DOT[o.status]||'#ccc'}"></div>
+          <div class="order-info">
+            <div class="order-id">${esc(o.orderId)}</div>
+            <div class="order-meta">${esc(o.status)} · ${esc(o.phone)}</div>
+            ${o.cell ? `<div class="cell-badge">📦 Ячейка: ${esc(o.cell)}</div>` : ''}
+          </div>
+        </div>
+        ${actionsHtml}
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// ОТЧЁТ ТУ/РУ
+// ══════════════════════════════════════════
+let reportData = [];
+
+async function loadReport(filter) {
+  document.getElementById("reportList").innerHTML =
+    '<div class="loader"><div class="spinner"></div>Загрузка...</div>';
+  const res = await api("get_report", { filter });
+  reportData = res.rows || [];
+
+  const s = res.stats || {};
+  document.getElementById("reportStats").innerHTML = `
+    <div class="stat-card"><div class="stat-num">${s.total||0}</div><div class="stat-lbl">Всего</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--orange)">${s.waiting||0}</div><div class="stat-lbl">Ожидают</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${s.received||0}</div><div class="stat-lbl">Приняты</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${s.issued||0}</div><div class="stat-lbl">Выданы</div></div>
+  `;
+  renderReport(reportData);
+}
+
+function filterReport(filter, btn) {
+  document.querySelectorAll("#screen-report .filter-row .filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  loadReport(filter);
+}
+
+const BADGE = {
+  "Принят":         ["badge-received","Принят"],
+  "Выдан":          ["badge-issued",  "Выдан"],
+  "Возврат":        ["badge-returned","Возврат"],
+  "Ожидает приемки":["badge-waiting", "Ожидает"],
+};
+
+function renderReport(rows) {
+  const el = document.getElementById("reportList");
+  if (!rows.length) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--tg-hint)">
+        <div style="font-size:40px;margin-bottom:12px">📊</div>
+        <div style="font-size:15px;font-weight:500">Нет данных для отображения</div>
+        <div style="font-size:13px;margin-top:6px">Попробуйте другой фильтр</div>
+      </div>`;
+    return;
+  }
+  // [FIX-4] Все данные из таблицы экранируются через esc()
+  el.innerHTML = rows.map(r => {
+    const [bc, bt] = BADGE[r.statusRec] || ["badge-waiting","—"];
+    return `
+      <div class="report-row">
+        <div class="rr-order">
+          ${esc(r.orderId)}
+          <span class="status-badge ${bc}">${bt}</span>
+          ${r.statusIss === "Выдан" ? '<span class="status-badge badge-issued">Выдан</span>' : ''}
+          ${r.statusRet === "Возврат" ? '<span class="status-badge badge-returned">Возврат</span>' : ''}
+        </div>
+        <div class="rr-meta">${esc(r.pvz)} · ${esc(r.phone)} · ${esc(r.createdAt)}</div>
+        ${r.reason ? `<div class="rr-meta">Причина: ${esc(r.reason)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// УТИЛИТЫ
+// ══════════════════════════════════════════
+
+// [FIX-4] XSS: экранируем все данные из Google Sheets перед вставкой в innerHTML
+function esc(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ══════════════════════════════════════════
+// SECURE API: Telegram initData → Supabase Edge Function
+// ══════════════════════════════════════════
+const USE_MOCK = false;
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+function getTelegramInitData() {
+  return window.Telegram?.WebApp?.initData || "";
+}
+
+async function api(action, extra = {}) {
+  if (USE_MOCK) {
+    await delay(250);
+    return {};
+  }
+
+  try {
+    const initData = getTelegramInitData();
+    if (!initData && !DEV_ALLOW_BROWSER_TEST) {
+      tg.showAlert("Mini App открыт не из Telegram или отсутствует initData. Откройте приложение через Telegram-бота.");
+      return {};
+    }
+
+    const resp = await fetch(PVZ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY,
+        "x-telegram-init-data": initData
+      },
+      body: JSON.stringify({
+        action,
+        payload: extra || {},
+        // Дублируем в body для окружений/прокси, которые режут custom headers.
+        initData
+      })
+    });
+
+    const text = await resp.text();
+    let json;
+    try { json = text ? JSON.parse(text) : {}; }
+    catch(e) {
+      console.error("Bad JSON from Edge Function", text);
+      tg.showAlert("Ошибка ответа сервера. Проверьте Edge Function pvz-api.");
+      return {};
+    }
+
+    if (!resp.ok || !json.ok) {
+      console.error("PVZ API error", action, json);
+      tg.showAlert("Ошибка сервера: " + (json.error || resp.statusText));
+      return {};
+    }
+
+    return json.data || {};
+  } catch(e) {
+    console.error("PVZ API fetch error:", action, e);
+    tg.showAlert("Сбой сети или API: " + e.message);
+    return {};
+  }
+}
+
+function showResult(id, type, title, body) {
+  const el = document.getElementById(id);
+  el.className = "result-card visible " + type;
+  el.innerHTML = `<div class="rc-title">${title}</div><div class="rc-body">${body}</div>`;
+}
+
+// ══════════════════════════════════════════
+// СТАРТ
+// ══════════════════════════════════════════
+
+// Проверка конфига до запуска
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes("ВСТАВЬТЕ")) {
+  document.body.innerHTML = `
+    <div style="padding:32px;font-family:sans-serif;color:#c00;text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">⚙️</div>
+      <h2>Supabase не настроен</h2>
+      <p style="margin-top:8px;color:#555;font-size:14px">Укажите <code>SUPABASE_URL</code> и <code>SUPABASE_KEY</code> в HTML.</p>
+    </div>`;
+} else { init(); }
+</script>
+</body>
+</html>

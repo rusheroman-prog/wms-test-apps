@@ -1,0 +1,2310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uzum WMS — Станция обработки v4.3.1.1</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --primary: #7000ff;
+      --primary-dark: #5400c8;
+      --primary-soft: #f1e9ff;
+      --success: #16a34a;
+      --success-soft: #eafaf0;
+      --danger: #dc2626;
+      --danger-soft: #fff0f0;
+      --warning: #f59e0b;
+      --warning-soft: #fff8e5;
+      --info: #2563eb;
+      --info-soft: #edf5ff;
+      --bg: #f3f5f8;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --border: #d9dee8;
+      --text: #162033;
+      --muted: #667085;
+      --muted-2: #98a2b3;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+      --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.06);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --nav-height: 64px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    button, input { font-family: inherit; }
+    button { border: 0; }
+
+    .app-shell { display: flex; flex-direction: column; height: 100vh; }
+
+    .top-nav {
+      height: var(--nav-height);
+      background: #111827;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 18px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 210px;
+    }
+    .brand-logo {
+      width: 38px; height: 38px;
+      display: grid; place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary), #9b5cff);
+      font-size: 20px;
+      box-shadow: 0 8px 24px rgba(112,0,255,0.35);
+    }
+    .brand-title { font-weight: 950; letter-spacing: 0.6px; line-height: 1; }
+    .brand-subtitle { color: rgba(255,255,255,0.62); font-size: 11px; margin-top: 4px; }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      flex: 1;
+      justify-content: center;
+    }
+    .nav-tab {
+      height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      color: rgba(255,255,255,0.74);
+      background: transparent;
+      cursor: pointer;
+      font-weight: 800;
+      white-space: nowrap;
+      transition: 0.18s ease;
+      border: 1px solid transparent;
+    }
+    .nav-tab:hover { background: rgba(255,255,255,0.08); color: white; }
+    .nav-tab.active {
+      background: white;
+      color: #111827;
+      border-color: rgba(255,255,255,0.2);
+    }
+    .nav-tab:focus-visible, .btn:focus-visible, input:focus-visible, .stat-card:focus-visible, .order-card:focus-visible {
+      outline: 3px solid rgba(112,0,255,0.35);
+      outline-offset: 2px;
+    }
+
+    .user-info {
+      min-width: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      color: rgba(255,255,255,0.82);
+      font-size: 13px;
+    }
+    .role-pill, .status-pill, .mini-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+      background: rgba(255,255,255,0.12);
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.18); }
+    .logout-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: white;
+      padding: 7px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,0.16); }
+
+    .content-area {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .view {
+      display: none;
+      width: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .view.active { display: flex; }
+
+    .sidebar {
+      width: 350px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      min-height: 0;
+    }
+    .sidebar-header {
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fff, #fbfcff);
+    }
+    .sidebar-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 950; }
+    .sidebar-subtitle { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .sidebar-tools { margin-top: 14px; display: flex; gap: 8px; }
+
+    .search-input, .input-large, .input-normal {
+      width: 100%;
+      border: 2px solid var(--border);
+      background: white;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      transition: 0.18s ease;
+    }
+    .search-input { padding: 11px 12px; font-size: 14px; }
+    .input-large { padding: 16px; font-size: 20px; font-weight: 800; }
+    .input-normal { padding: 13px 14px; font-size: 16px; }
+    .search-input:focus, .input-large:focus, .input-normal:focus {
+      border-color: var(--primary);
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(112,0,255,0.09);
+    }
+    .input-error { border-color: var(--danger) !important; box-shadow: 0 0 0 4px rgba(220,38,38,0.10) !important; }
+    .input-ok { border-color: var(--success) !important; box-shadow: 0 0 0 4px rgba(22,163,74,0.10) !important; }
+
+    .order-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .order-card {
+      width: 100%;
+      background: white;
+      border: 1px solid #e8edf5;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      transition: 0.18s ease;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.03);
+    }
+    .order-card:hover { border-color: rgba(112,0,255,0.28); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+    .order-card.active { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 8px 22px rgba(112,0,255,0.13); }
+    .order-card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .order-id { font-weight: 950; font-size: 17px; }
+    .order-dest { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.3; }
+    .order-meta { color: var(--muted-2); font-size: 12px; margin-top: 8px; }
+
+
+    .packing-table-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .table-order-card {
+      background: white;
+      border: 2px solid #e8edf5;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+      transition: 0.18s ease;
+    }
+    .table-order-card:hover {
+      border-color: rgba(112,0,255,0.42);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
+    }
+    .table-order-card .table-order-id {
+      font-size: 22px;
+      font-weight: 950;
+      color: var(--primary);
+    }
+    .table-order-card .table-order-dest {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .table-order-card .table-order-footer {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .table-order-card.active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+    }
+
+    .empty-state {
+      height: 100%;
+      min-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 26px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+    .empty-state-card {
+      background: #fbfcff;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+    }
+
+    .main-panel {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      padding: 26px;
+      position: relative;
+    }
+    .page-card {
+      background: var(--surface);
+      border: 1px solid #e8edf5;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      padding: 24px;
+    }
+    .page-card + .page-card { margin-top: 18px; }
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .panel-title { margin: 0; font-size: 30px; font-weight: 950; letter-spacing: -0.6px; }
+    .panel-subtitle { margin: 7px 0 0; color: var(--muted); line-height: 1.4; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric-card {
+      background: #fbfcff;
+      border: 1px solid #e9eef6;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .metric-label { color: var(--muted); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; }
+    .metric-value { font-size: 28px; font-weight: 950; margin-top: 4px; }
+
+    .progress-container {
+      height: 12px;
+      background: #e9eef6;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--success), #4ade80);
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    .scan-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: linear-gradient(180deg, #fff, #fbfcff);
+      border: 2px solid rgba(112,0,255,0.14);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .input-hint { font-size: 13px; color: var(--muted); margin-top: 7px; font-weight: 700; }
+
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+    }
+    .item-row {
+      background: white;
+      padding: 16px;
+      border-radius: 16px;
+      border: 2px solid #e9eef6;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      transition: 0.18s ease;
+    }
+    .item-row.checked { border-color: rgba(22,163,74,0.55); background: var(--success-soft); }
+    .item-name { font-weight: 950; font-size: 16px; line-height: 1.25; }
+    .item-sku { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .stock-locations { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .stock-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid #e7ecf4;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+    .qty-counter { min-width: 86px; text-align: right; }
+    .qty-big { font-size: 28px; font-weight: 950; line-height: 1; }
+    .qty-label { color: var(--muted); font-size: 12px; margin-top: 5px; font-weight: 800; }
+
+    .btn {
+      min-height: 44px;
+      padding: 12px 18px;
+      border-radius: 13px;
+      cursor: pointer;
+      font-weight: 950;
+      font-size: 15px;
+      transition: 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+    .btn-primary { background: var(--primary); color: white; box-shadow: 0 10px 24px rgba(112,0,255,0.22); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: white; box-shadow: 0 10px 24px rgba(22,163,74,0.18); }
+    .btn-success:hover:not(:disabled) { filter: brightness(0.95); transform: translateY(-1px); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-outline { background: white; color: var(--text); border: 2px solid var(--border); }
+    .btn-outline:hover:not(:disabled) { background: var(--surface-2); border-color: #b9c2d1; }
+    .btn-small { min-height: 36px; padding: 8px 12px; border-radius: 10px; font-size: 13px; }
+    .btn-wide { width: 100%; }
+
+    .loader-badge {
+      display: none;
+      position: fixed;
+      top: calc(var(--nav-height) + 12px);
+      right: 16px;
+      background: rgba(17,24,39,0.92);
+      color: white;
+      padding: 9px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    .loader-badge.visible { display: inline-flex; align-items: center; gap: 8px; }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9998;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: min(430px, calc(100vw - 40px));
+    }
+    .toast {
+      padding: 15px 18px;
+      border-radius: 14px;
+      color: white;
+      font-weight: 850;
+      font-size: 14px;
+      line-height: 1.4;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateX(30px);
+      animation: toastIn 0.18s ease forwards, toastOut 0.25s ease 3.75s forwards;
+      border-left: 5px solid rgba(255,255,255,0.35);
+    }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+    .toast.warning { background: var(--warning); color: #231500; }
+    .toast.info { background: var(--info); }
+    @keyframes toastIn { to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateX(20px); } }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 7px; font-weight: 950; color: #344054; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .inbound-container { width: min(900px, 100%); margin: 0 auto; }
+    .inbound-log { margin: 18px 0 0; display: grid; gap: 8px; padding: 0; list-style: none; }
+    .inbound-log li { padding: 12px 14px; border-radius: 12px; background: var(--success-soft); border: 1px solid rgba(22,163,74,0.22); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: #14532d; }
+
+    .box-setup {
+      background: white;
+      padding: 22px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 18px;
+      border: 2px dashed #cfd7e6;
+    }
+    .box-locked {
+      background: white;
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 18px;
+      border: 1px solid #e8edf5;
+    }
+    .box-header-line { display:flex; justify-content:space-between; align-items:center; gap:16px; padding-bottom:16px; border-bottom:1px solid #edf1f7; margin-bottom:16px; }
+    .current-box-code { color: var(--primary); font-size: 26px; font-weight: 950; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .box-items { background: white; border-radius: var(--radius); overflow: hidden; border: 1px solid #e8edf5; box-shadow: var(--shadow-soft); }
+    .box-items-head { background: #f8fafc; padding: 15px 18px; border-bottom: 1px solid #e8edf5; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .box-item-row { padding: 12px 16px; border-bottom: 1px solid #edf1f7; display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+    .box-item-row:last-child { border-bottom: 0; }
+
+    .data-table-wrap { overflow-x: auto; background: white; border: 1px solid #e8edf5; border-radius: var(--radius); box-shadow: var(--shadow-soft); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 13px 15px; border-bottom: 1px solid #edf1f7; text-align: left; vertical-align: middle; }
+    th { background: #111827; color: white; font-size: 12px; text-transform: uppercase; letter-spacing: 0.45px; }
+    td { font-size: 14px; }
+    tr:last-child td { border-bottom: 0; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      cursor: pointer;
+      transition: 0.18s ease;
+      border: 1px solid #e8edf5;
+      border-top: 6px solid var(--primary);
+      text-align: left;
+    }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.35px; }
+    .stat-value { font-size: 42px; font-weight: 950; margin-top: 8px; line-height: 1; }
+    .stat-link { margin-top: 14px; font-size: 13px; color: var(--primary); font-weight: 950; }
+
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .table-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+    /* ── Этикетка отправления: шаблон как в Google Sheets ─────────────── */
+    #label-to-print {
+      display: none;
+      width: 260px;
+      margin: 0 auto;
+      text-align: center;
+      color: #000;
+      background: #fff;
+      padding: 8px;
+      font-family: Arial, sans-serif;
+    }
+    #label-to-print .label-route {
+      border: 3px solid #000;
+      font-size: 48px;
+      font-weight: 900;
+      border-radius: 8px;
+      padding: 4px 0;
+      margin: 4px 0;
+      letter-spacing: 2px;
+      line-height: 1.05;
+    }
+    #label-to-print .label-pvz {
+      font-size: 16px;
+      font-weight: bold;
+      border-bottom: 2px solid #000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      line-height: 1.15;
+    }
+    #label-to-print .label-order { font-size: 20px; font-weight: bold; margin: 4px 0; }
+    #label-to-print .label-phone { font-size: 13px; color: #555; }
+    #label-to-print .label-box { font-size: 12px; color: #777; margin-top: 4px; }
+    #label-to-print .label-print-meta { font-size: 10px; color: #777; margin-top: 5px; }
+    #label-qr { display: flex; justify-content: center; margin: 6px 0; }
+
+    .print-history-list { display: grid; gap: 8px; margin-top: 12px; }
+    .print-history-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e8edf5;
+      border-radius: 12px;
+      background: #fbfcff;
+      font-size: 13px;
+    }
+    .print-history-row b { color: var(--text); }
+    .print-history-row span { color: var(--muted); }
+
+    @media print {
+      body * { visibility: hidden; }
+      #label-to-print, #label-to-print * { visibility: visible; }
+      #label-to-print { position: absolute; left: 0; top: 0; display: block !important; width: 260px; }
+    }
+
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(112,0,255,0.45), transparent 34%),
+        radial-gradient(circle at 90% 90%, rgba(37,99,235,0.35), transparent 38%),
+        linear-gradient(135deg, #0b1020 0%, #111827 55%, #1f2937 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-box {
+      width: min(440px, 100%);
+      background: rgba(255,255,255,0.98);
+      border-radius: 26px;
+      padding: 42px 36px;
+      box-shadow: 0 35px 90px rgba(0,0,0,0.42);
+      border: 1px solid rgba(255,255,255,0.36);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo-icon {
+      width: 72px; height: 72px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--primary), #9b5cff);
+      display: grid; place-items: center;
+      margin: 0 auto 14px;
+      color: white;
+      font-size: 36px;
+      box-shadow: 0 18px 45px rgba(112,0,255,0.3);
+    }
+    .login-logo h1 { margin: 0; font-size: 28px; font-weight: 950; letter-spacing: 1.5px; }
+    .login-logo p { margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+    .login-error {
+      display: none;
+      background: var(--danger-soft);
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-top: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .login-error.visible { display: block; }
+
+    @media (max-width: 950px) {
+      body { overflow: auto; }
+      .app-shell { height: auto; min-height: 100vh; }
+      .top-nav { height: auto; min-height: var(--nav-height); flex-wrap: wrap; padding: 12px; }
+      .brand, .user-info { min-width: 0; width: 100%; justify-content: space-between; }
+      .nav-tabs { justify-content: flex-start; width: 100%; order: 3; }
+      .content-area, .view { overflow: visible; }
+      .view.active { flex-direction: column; }
+      .sidebar { width: 100%; max-height: 360px; border-right: 0; border-bottom: 1px solid var(--border); }
+      .main-panel { overflow: visible; padding: 16px; }
+      .scan-box { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .panel-header { flex-direction: column; }
+      .panel-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">🏭</div>
+      <h1>UZUM WMS</h1>
+      <p>Станция обработки склада</p>
+    </div>
+    <div class="form-group">
+      <label for="login-email">Email</label>
+      <input class="input-normal" type="email" id="login-email" placeholder="warehouse@company.com" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label for="login-password">Пароль</label>
+      <input class="input-normal" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn btn-primary btn-wide" id="login-btn">Войти в систему</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-shell">
+  <nav class="top-nav" aria-label="Main Navigation">
+    <div class="brand">
+      <div class="brand-logo">📦</div>
+      <div>
+        <div class="brand-title">UZUM WMS</div>
+        <div class="brand-subtitle">Packaging Scan · Dispatch · Inbound · Dashboard</div>
+      </div>
+    </div>
+
+    <div class="nav-tabs" role="tablist" aria-label="Разделы WMS">
+      <button class="nav-tab active" role="tab" aria-selected="true" data-target="packing">📦 Упаковка</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="dispatch">🚚 Отгрузка</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="inbound">📥 Приемка</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="logs">📜 Журнал</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="dashboard">📊 Мониторинг</button>
+    </div>
+
+    <div id="user-info" class="user-info">
+      <span class="status-pill"><span class="status-dot"></span> Online</span>
+      <span>Station #1</span>
+    </div>
+  </nav>
+
+  <div id="global-loader" class="loader-badge"><span class="spinner"></span><span id="loader-text">Ожидание БД...</span></div>
+  <div id="toast-container" aria-live="polite"></div>
+
+  <main class="content-area">
+    <section id="view-packing" class="view active" role="tabpanel" aria-label="Упаковка">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">
+            <span>В работе</span>
+            <span class="mini-pill" id="pack-count">0</span>
+          </div>
+          <div class="sidebar-subtitle">Только заказы, уже взятые в упаковку (PACKING). Все новые собранные заказы показываются на столе упаковки справа.</div>
+          <div class="sidebar-tools">
+            <input type="search" id="pack-search" class="search-input" placeholder="Поиск в работе" />
+            <button class="btn btn-outline btn-small" id="btn-pack-refresh" title="Обновить">↻</button>
+          </div>
+        </div>
+        <div id="order-list" class="order-list"></div>
+      </aside>
+
+      <div class="main-panel">
+        <div id="pack-table-view" class="page-card">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title">Стол упаковки</h1>
+              <p class="panel-subtitle">Здесь показываются только заказы, у которых отбор завершён полностью: qty_picked = qty_plan. Выберите заказ на столе, отсканируйте каждую штуку и только после полного совпадения печатайте QR-этикетку.</p>
+            </div>
+            <button class="btn btn-outline" id="btn-pack-table-refresh">↻ Обновить</button>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-card"><div class="metric-label">На столе</div><div class="metric-value" id="pack-table-count">0</div></div>
+            <div class="metric-card"><div class="metric-label">В работе слева</div><div class="metric-value" id="pack-work-count">0</div></div>
+          </div>
+          <div id="packing-table-list" class="packing-table-grid"></div>
+        </div>
+
+        <div id="pack-main" style="display:none;">
+          <div class="page-card">
+            <div class="panel-header">
+              <div>
+                <h1 class="panel-title" id="pack-title">Заказ</h1>
+                <p class="panel-subtitle" id="pack-destination">Назначение: —</p>
+              </div>
+              <div class="table-actions">
+                <button class="btn btn-outline" id="btn-cancel-pack">Снять выбор</button>
+                <button class="btn btn-success" id="finish-btn" disabled>🖨 Завершить и печать QR</button>
+              </div>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric-card"><div class="metric-label">Прогресс</div><div class="metric-value" id="pack-progress-percent">0%</div></div>
+              <div class="metric-card"><div class="metric-label">Отсканировано</div><div class="metric-value" id="pack-progress-text">0 / 0</div></div>
+              <div class="metric-card"><div class="metric-label">Позиций SKU</div><div class="metric-value" id="pack-sku-count">0</div></div>
+            </div>
+            <div class="progress-container"><div class="progress-bar" id="pack-progress-bar"></div></div>
+          </div>
+
+          <div class="scan-box">
+            <div>
+              <input type="text" id="pack-barcode-input" class="input-large" placeholder="Сканируйте SKU товара..." autocomplete="off" />
+              <div class="input-hint">Сверка состава идёт через БД: каждый скан записывается в packaging_scans и увеличивает qty_packaged.</div>
+            </div>
+            <button class="btn btn-primary" id="btn-pack-manual">Проверить</button>
+          </div>
+
+          <div class="items-grid" id="pack-items-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-dispatch" class="view" role="tabpanel" aria-label="Отгрузка">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">
+            <span>Ждут отгрузки</span>
+            <span class="mini-pill" id="dispatch-count">0</span>
+          </div>
+          <div class="sidebar-subtitle">Только заказы PACKED после проверки состава и печати QR.</div>
+          <div class="sidebar-tools">
+            <input type="search" id="dispatch-search" class="search-input" placeholder="Поиск по ID / ПВЗ" />
+            <button class="btn btn-outline btn-small" id="btn-dispatch-refresh" title="Обновить">↻</button>
+          </div>
+        </div>
+        <div id="dispatch-list" class="order-list"></div>
+      </aside>
+
+      <div class="main-panel">
+        <div class="panel-header">
+          <div>
+            <h1 class="panel-title">Комплектация ящика</h1>
+            <p class="panel-subtitle">Зафиксируйте тару, затем сканируйте ID заказов. Разные ПВЗ в одном ящике блокируются.</p>
+          </div>
+          <button class="btn btn-primary" id="dispatch-btn" disabled>🚚 Закрыть и отгрузить</button>
+        </div>
+
+        <div id="dispatch-setup-area" class="box-setup">
+          <h3 style="margin:0 0 14px;">1. Идентификация тары</h3>
+          <div class="scan-box" style="margin:0; border-style:solid;">
+            <div>
+              <input type="text" id="dispatch-box-input" class="input-large" placeholder="Сканируйте штрихкод ящика / мешка..." autocomplete="off" />
+              <div class="input-hint">После фиксации ящик будет привязан к отсканированным заказам.</div>
+            </div>
+            <button class="btn btn-outline" id="lock-box-btn">Зафиксировать</button>
+          </div>
+        </div>
+
+        <div id="dispatch-scan-area" class="box-locked" style="display:none;">
+          <div class="box-header-line">
+            <div>
+              <div style="color:var(--muted); font-weight:900; font-size:12px; text-transform:uppercase;">Текущий ящик</div>
+              <div class="current-box-code" id="current-box-display">—</div>
+              <div id="current-box-destination" style="color:var(--muted); font-weight:800; margin-top:4px;">ПВЗ: будет определен первым заказом</div>
+            </div>
+            <button class="btn btn-outline btn-small" id="unlock-box-btn">Сменить ящик</button>
+          </div>
+          <input type="text" id="dispatch-barcode-input" class="input-large" placeholder="Сканируйте ID заказа..." autocomplete="off" />
+          <div class="input-hint">Если заказ не найден в PACKED или уже добавлен, система покажет ошибку.</div>
+        </div>
+
+        <div class="box-items">
+          <div class="box-items-head">
+            <b>Заказы в текущем ящике</b>
+            <span id="box-total-count" class="mini-pill" style="background:var(--primary); color:white;">0 шт.</span>
+          </div>
+          <div id="current-box-items"></div>
+        </div>
+
+        <div class="page-card" style="margin-top:18px;">
+          <div class="panel-header" style="margin-bottom:14px;">
+            <div>
+              <h2 style="margin:0;font-size:22px;font-weight:950;">Повторная печать этикетки</h2>
+              <p class="panel-subtitle">Введите или отсканируйте ID заказа. История печати хранится по каждому заказу.</p>
+            </div>
+          </div>
+          <div class="scan-box" style="margin-bottom:12px;">
+            <div>
+              <input type="text" id="reprint-order-input" class="input-large" placeholder="ID заказа для повторной печати..." autocomplete="off" />
+              <div class="input-hint">Повторная печать доступна после статуса PACKED. Шаблон этикетки — как в старом Google Sheets.</div>
+            </div>
+            <div class="table-actions">
+              <button class="btn btn-outline" id="btn-load-print-history">История</button>
+              <button class="btn btn-primary" id="btn-reprint-label">🖨 Повторная печать</button>
+            </div>
+          </div>
+          <div id="print-history-list" class="print-history-list">
+            <div class="empty-state-card" style="text-align:center;color:var(--muted);">История печати появится после ввода ID заказа.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-inbound" class="view" role="tabpanel" aria-label="Приемка">
+      <div class="main-panel">
+        <div class="inbound-container">
+          <div class="page-card">
+            <div class="panel-header">
+              <div>
+                <h1 class="panel-title">Приход / пополнение товара на склад</h1>
+                <p class="panel-subtitle">Сканируйте SKU, укажите количество и ячейку хранения. Приёмка пишется в warehouse_stock, storage_cells, stock_movements и operation_events.</p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="inb-sku">SKU товара</label>
+              <input type="text" id="inb-sku" class="input-large" placeholder="Отсканируйте штрихкод SKU" autocomplete="off" />
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="inb-qty">Количество</label>
+                <input type="number" id="inb-qty" class="input-large" placeholder="0" min="1" inputmode="numeric" />
+              </div>
+              <div class="form-group">
+                <label for="inb-cell">Ячейка хранения</label>
+                <input type="text" id="inb-cell" class="input-large" placeholder="Напр: A-01-01" autocomplete="off" />
+              </div>
+            </div>
+            <div class="table-actions">
+              <button class="btn btn-primary" id="btn-inbound">📥 Принять на баланс</button>
+              <button class="btn btn-outline" id="btn-clear-inbound-cell">Очистить ячейку</button>
+            </div>
+          </div>
+          <ul id="inb-log" class="inbound-log"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-logs" class="view" role="tabpanel" aria-label="Журнал">
+      <div class="main-panel" style="width:100%;">
+        <div class="toolbar">
+          <div>
+            <h1 class="panel-title">История движений товара</h1>
+            <p class="panel-subtitle">Последние операции по остаткам. По умолчанию — 100 строк.</p>
+          </div>
+          <div class="table-actions">
+            <input type="search" id="logs-search" class="search-input" style="width:260px;" placeholder="Фильтр SKU / ячейка / документ" />
+            <button class="btn btn-outline" id="btn-logs-refresh">↻ Обновить</button>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Время</th><th>SKU</th><th>Ячейка</th><th>Тип</th><th>Изменение</th><th>Остаток</th><th>Документ</th></tr>
+            </thead>
+            <tbody id="logs-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-dashboard" class="view" role="tabpanel" aria-label="Мониторинг">
+      <div class="main-panel" style="width:100%;">
+        <div id="dashboard-main-view">
+          <div class="toolbar">
+            <div>
+              <h1 class="panel-title">Мониторинг заказов и статусов</h1>
+              <p class="panel-subtitle">Данные берутся через RPC get_sklad_dashboard_v1. Нажмите на карточку, чтобы открыть список заказов по статусу.</p>
+            </div>
+            <button class="btn btn-outline" id="btn-dashboard-refresh">↻ Обновить</button>
+          </div>
+          <div id="stats-grid" class="stats-grid"></div>
+        </div>
+
+        <div id="dashboard-details-view" class="page-card" style="display:none;">
+          <div class="toolbar">
+            <div class="table-actions">
+              <button class="btn btn-outline" id="btn-dash-back">⬅ Назад</button>
+              <h2 id="details-view-title" style="margin:0;">Детализация</h2>
+            </div>
+            <input type="search" id="dashboard-detail-search" class="search-input" style="width:280px;" placeholder="Фильтр по ID / ПВЗ / ящику" />
+          </div>
+          <div class="data-table-wrap">
+            <table>
+              <thead id="details-table-head"></thead>
+              <tbody id="details-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="label-to-print">
+  <div class="label-route" id="lbl-route">—</div>
+  <div class="label-pvz" id="lbl-pvz">ПВЗ</div>
+  <div id="label-qr"></div>
+  <div class="label-order" id="lbl-id">0000</div>
+  <div class="label-phone" id="lbl-phone"></div>
+  <div class="label-box" id="lbl-box" style="display:none;"></div>
+  <div class="label-print-meta" id="lbl-date"></div>
+</div>
+
+<script>
+  'use strict';
+
+  const CONFIG = {
+    S_URL: 'https://ysvogudznyuszssdriih.supabase.co',
+    S_KEY: 'sb_publishable_kU91fqnkt80hbLcVEms6oA_eXKVzY2A',
+    STATION_ID: 'STATION-1',
+    MAX_BOX_ITEMS: 50,
+    REFRESH_RATE_MS: 20000,
+    LOG_LIMIT: 100,
+    DETAILS_LIMIT: 300,
+    // Версия v4: упаковка идёт через RPC claim_order_for_packaging / scan_packaging_sku / finish_packaging_order.
+    // Скан каждой штуки фиксируется в БД, печать QR доступна только при qty_packaged = qty_plan.
+    USE_STRONG_RPC_WHEN_AVAILABLE: true
+  };
+
+  const APP_STATE = {
+    currentView: 'packing',
+    busy: false,
+    session: null,
+    manager: null,
+    packing: {
+      currentOrder: null,
+      items: [],
+      list: [],
+      search: ''
+    },
+    dispatch: {
+      availableOrders: [],
+      currentBox: [],
+      boxId: null,
+      boxDestination: null,
+      search: ''
+    },
+    inbound: { logs: [] },
+    logs: { rows: [], search: '' },
+    dashboard: {
+      counts: {},
+      detailsRows: [],
+      activeStatusKey: null,
+      activeStatusLabel: null,
+      detailSearch: ''
+    },
+    rpcAvailability: {}
+  };
+
+  const db = window.supabase.createClient(CONFIG.S_URL, CONFIG.S_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+  const Utils = {
+    escapeHTML: (str) => String(str ?? '').replace(/[&<>'"]/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[ch])),
+
+    normalize: (value) => String(value ?? '').trim(),
+    lower: (value) => String(value ?? '').toLowerCase(),
+
+    formatDateTime: (value) => {
+      if (!value) return '—';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return '—';
+      return dt.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    },
+
+    showToast: (msg, type = 'success') => {
+      const container = $('#toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    },
+
+    setBusy: (isBusy, text = 'Ожидание БД...') => {
+      APP_STATE.busy = isBusy;
+      $('#loader-text').textContent = text;
+      $('#global-loader').classList.toggle('visible', isBusy);
+      $$('button').forEach(btn => {
+        if (btn.dataset.noBusyLock === 'true') return;
+        btn.classList.toggle('is-busy', isBusy);
+      });
+    },
+
+    handleApiError: (error, fallbackMsg) => {
+      if (!error) return false;
+      console.error(fallbackMsg, error);
+      Utils.showToast(`${fallbackMsg}: ${error.message || error}`, 'error');
+      return true;
+    },
+
+    setInputState: (input, state) => {
+      if (!input) return;
+      input.classList.remove('input-error', 'input-ok');
+      if (state === 'error') input.classList.add('input-error');
+      if (state === 'ok') input.classList.add('input-ok');
+      setTimeout(() => input.classList.remove('input-error', 'input-ok'), 650);
+    },
+
+    filterRows: (rows, search, fields) => {
+      const q = Utils.lower(search);
+      if (!q) return rows;
+      return rows.filter(row => fields.some(f => Utils.lower(row[f]).includes(q)));
+    },
+
+    isMissingFunctionError: (error) => {
+      const msg = Utils.lower(error?.message || '');
+      return msg.includes('could not find the function') || msg.includes('function') && msg.includes('does not exist');
+    },
+
+    safeNumber: (value, fallback = 0) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+  };
+
+  const Api = {
+    async rpcRequired(name, args) {
+      const { data, error } = await db.rpc(name, args || {});
+      if (error) {
+        if (Utils.isMissingFunctionError(error)) {
+          throw new Error(`RPC ${name} не найдена. Запусти SQL-патч упаковки v4 перед использованием этой станции.`);
+        }
+        throw error;
+      }
+      if (data && data.ok === false) throw new Error(data.error || data.message || `RPC ${name} вернула ошибку`);
+      return data;
+    },
+
+    async rpcOptional(name, args) {
+      if (APP_STATE.rpcAvailability[name] === false) return { data: null, skipped: true };
+      const { data, error } = await db.rpc(name, args || {});
+      if (error) {
+        if (Utils.isMissingFunctionError(error)) {
+          APP_STATE.rpcAvailability[name] = false;
+          console.info(`RPC ${name} отсутствует. Используется fallback.`);
+          return { data: null, skipped: true };
+        }
+        throw error;
+      }
+      APP_STATE.rpcAvailability[name] = true;
+      return { data, skipped: false };
+    },
+
+    operatorId() {
+      return APP_STATE.session?.user?.id || APP_STATE.manager?.full_name || 'packing-operator';
+    },
+
+    async getManager(userId) {
+      const { data, error } = await db.from('managers')
+        .select('full_name, role')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+
+    normalizeOrder(raw) {
+      if (!raw) return raw;
+      const dest = raw.branch_name || raw.destination || raw.pvz_code || (raw.route_number ? `Маршрут ${raw.route_number}` : '—');
+      return {
+        ...raw,
+        branch_name: dest,
+        box_id: raw.box_id || raw.box_barcode || raw.box_barcode,
+        qty_plan: Utils.safeNumber(raw.qty_plan ?? raw.total_qty, 0),
+        qty_packaged: Utils.safeNumber(raw.qty_packaged, 0),
+        qty_picked: Utils.safeNumber(raw.qty_picked ?? raw.picked_qty, 0),
+        items_count: Utils.safeNumber(raw.items_count, 0)
+      };
+    },
+
+    async fetchPackOrders() {
+      const result = await Api.rpcRequired('get_packaging_orders', { p_limit: 500 });
+      return (result.orders || []).map(Api.normalizeOrder);
+    },
+
+    async claimPackagingOrder(orderId) {
+      const result = await Api.rpcRequired('claim_order_for_packaging', {
+        p_order_id: orderId,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID
+      });
+      return Api.normalizePackagingOrder(result.order);
+    },
+
+    normalizePackagingOrder(raw) {
+      const order = Api.normalizeOrder(raw || {});
+      const items = Array.isArray(raw?.items) ? raw.items : [];
+      order.items = items.map(item => ({
+        ...item,
+        qty_plan: Utils.safeNumber(item.qty_plan, 0),
+        qty_packaged: Utils.safeNumber(item.qty_packaged, 0),
+        qty_picked: Utils.safeNumber(item.qty_picked, 0),
+        done: Boolean(item.done)
+      }));
+      return order;
+    },
+
+    async scanPackagingSku(orderId, sku) {
+      const result = await Api.rpcRequired('scan_packaging_sku', {
+        p_order_id: orderId,
+        p_sku: sku,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID
+      });
+      return {
+        ...result,
+        order: Api.normalizePackagingOrder(result.order)
+      };
+    },
+
+    async finishPackaging(orderId, packageBarcode = null) {
+      const result = await Api.rpcRequired('finish_packaging_order', {
+        p_order_id: orderId,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID,
+        p_package_barcode: packageBarcode
+      });
+      return {
+        ...result,
+        order: Api.normalizePackagingOrder(result.order),
+        label: result.label || result.order?.label || null
+      };
+    },
+
+    async recordLabelPrint(externalId, reason = 'REPRINT') {
+      return Api.rpcRequired('record_shipping_label_print_by_external', {
+        p_external_id: externalId,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID,
+        p_print_reason: reason
+      });
+    },
+
+    async getLabelPrintHistory(externalId) {
+      return Api.rpcRequired('get_shipping_label_print_history_by_external', {
+        p_external_id: externalId
+      });
+    },
+
+    async reprintShippingLabel(externalId) {
+      const result = await Api.rpcRequired('reprint_shipping_label_by_external', {
+        p_external_id: externalId,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID
+      });
+      try { await Api.recordLabelPrint(externalId, 'REPRINT'); } catch (historyError) { console.warn('Print history log failed', historyError); }
+      return {
+        ...result,
+        order: Api.normalizePackagingOrder(result.order),
+        label: result.label || result.order?.label || null
+      };
+    },
+
+    async cancelPackaging(orderId, reason = 'operator_cancelled') {
+      const result = await Api.rpcRequired('cancel_packaging_order', {
+        p_order_id: orderId,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID,
+        p_reason: reason
+      });
+      return {
+        ...result,
+        order: Api.normalizePackagingOrder(result.order)
+      };
+    },
+
+    async fetchDispatchOrders() {
+      const result = await Api.rpcRequired('get_dispatch_ready_orders', { p_limit: 1000 });
+      return (result.orders || []).map(Api.normalizeOrder);
+    },
+
+    async fetchLogs() {
+      // Совместимость: новая SQL-схема использует stock_movements, старая — stock_log.
+      let response = await db.from('stock_movements')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(CONFIG.LOG_LIMIT);
+      if (response.error) {
+        response = await db.from('stock_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(CONFIG.LOG_LIMIT);
+      }
+      if (response.error) throw response.error;
+      return response.data || [];
+    },
+
+    async fetchStats() {
+      const skladDashboard = await Api.rpcOptional('get_sklad_dashboard_v1');
+      if (!skladDashboard.skipped) return skladDashboard.data || [];
+
+      const result = await Api.rpcOptional('get_wms_stats');
+      if (!result.skipped) return result.data || [];
+
+      const { data, error } = await db.from('customer_orders').select('status');
+      if (error) throw error;
+      const counts = new Map();
+      (data || []).forEach(row => counts.set(row.status, (counts.get(row.status) || 0) + 1));
+      return Array.from(counts.entries()).map(([status, cnt]) => ({ status, cnt }));
+    },
+
+    async fetchOrderDetails(statusKey) {
+      // Детализация должна идти через SECURITY DEFINER RPC.
+      // Иначе при включённом RLS карточки мониторинга показывают счётчики,
+      // но прямой select из customer_orders возвращает 0 строк без ошибки.
+      const detailsRpc = await Api.rpcOptional('get_sklad_order_details_v1', {
+        p_status: statusKey,
+        p_limit: CONFIG.DETAILS_LIMIT
+      });
+      if (!detailsRpc.skipped) {
+        if (detailsRpc.data?.ok === false) throw new Error(detailsRpc.data.error || 'Ошибка детализации');
+        return (detailsRpc.data?.orders || []).map(Api.normalizeOrder);
+      }
+
+      // Fallback для старой схемы без RPC.
+      let query = db.from('customer_orders')
+        .select('external_id, pvz_code, route_number, phone, status, box_barcode, created_at')
+        .order('created_at', { ascending: false })
+        .limit(CONFIG.DETAILS_LIMIT);
+      if (statusKey !== 'TOTAL') query = query.eq('status', statusKey);
+      let { data, error } = await query;
+      if (error) {
+        query = db.from('customer_orders')
+          .select('external_id, branch_name, phone, status, box_id, created_at')
+          .order('created_at', { ascending: false })
+          .limit(CONFIG.DETAILS_LIMIT);
+        if (statusKey !== 'TOTAL') query = query.eq('status', statusKey);
+        const legacy = await query;
+        data = legacy.data;
+        error = legacy.error;
+      }
+      if (error) throw error;
+      return (data || []).map(Api.normalizeOrder);
+    },
+
+    async inboundStock(sku, cellCode, qty) {
+      const result = await Api.rpcRequired('sklad_increment_stock_v1', {
+        p_sku: sku,
+        p_cell_code: cellCode,
+        p_qty: qty,
+        p_operator_id: Api.operatorId(),
+        p_station_id: CONFIG.STATION_ID,
+        p_note: 'manual_inbound_from_sklad_app'
+      });
+      return result;
+    },
+
+    async shipBox(boxId, orders) {
+      for (const order of orders) {
+        const result = await Api.rpcRequired('ship_order_to_box', {
+          p_order_id: order.id,
+          p_box_barcode: boxId,
+          p_operator_id: Api.operatorId(),
+          p_station_id: CONFIG.STATION_ID
+        });
+        if (result.ok === false) throw new Error(result.error || `Не удалось отгрузить заказ ${order.external_id}`);
+      }
+    }
+  };
+
+  function choosePickLocation(item) {
+    const locations = item.stockLocations || [];
+    if (!locations.length) return { cell: item.cellInfo || 'Нет на полке', qty: null };
+    const enough = locations.find(loc => loc.qty === null || loc.qty === undefined ? false : Number(loc.qty) >= Number(item.qty));
+    if (enough) return enough;
+    return locations[0];
+  }
+
+  function buildStockMap(stockData) {
+    const map = new Map();
+    for (const row of stockData || []) {
+      const sku = String(row.sku ?? '');
+      if (!sku) continue;
+      if (!map.has(sku)) map.set(sku, []);
+      map.get(sku).push({
+        cell: row.cell || 'Нет ячейки',
+        qty: row.qty_on_hand !== undefined ? Utils.safeNumber(row.qty_on_hand, null) : (row.qty === undefined ? null : Utils.safeNumber(row.qty, null)),
+        reserved: row.qty_reserved === undefined ? null : Utils.safeNumber(row.qty_reserved, 0)
+      });
+    }
+    for (const locations of map.values()) {
+      locations.sort((a, b) => {
+        const aq = a.qty ?? -1;
+        const bq = b.qty ?? -1;
+        if (aq !== bq) return aq - bq;
+        return String(a.cell).localeCompare(String(b.cell));
+      });
+    }
+    return map;
+  }
+
+  function orderDestination(order) {
+    if (!order) return '—';
+    if (order.branch_name) return order.branch_name;
+    const parts = [];
+    if (order.pvz_code) parts.push(`ПВЗ ${order.pvz_code}`);
+    if (order.route_number !== null && order.route_number !== undefined && order.route_number !== '') parts.push(`Маршрут ${order.route_number}`);
+    return parts.join(' · ') || '—';
+  }
+
+  function createOrderCard(order, onClick, active = false) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `order-card${active ? ' active' : ''}`;
+    const progress = order.qty_plan ? `${order.qty_packaged || 0}/${order.qty_plan}` : (order.status || 'ID');
+    btn.innerHTML = `
+      <div class="order-card-top">
+        <div>
+          <div class="order-id">#${Utils.escapeHTML(order.external_id)}</div>
+          <div class="order-dest">${Utils.escapeHTML(orderDestination(order))}</div>
+          <div class="order-meta">${Utils.formatDateTime(order.created_at || order.assembled_at || order.packaged_at)}</div>
+        </div>
+        <span class="mini-pill">${Utils.escapeHTML(progress)}</span>
+      </div>`;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function renderEmpty(container, message, icon = '📭') {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-card">
+          <div style="font-size:36px; margin-bottom:8px;">${icon}</div>
+          <div>${Utils.escapeHTML(message)}</div>
+        </div>
+      </div>`;
+  }
+
+  async function loadPackList(options = {}) {
+    if (APP_STATE.busy && !options.force) return;
+    const list = $('#order-list');
+    if (!options.silent) renderEmpty(list, 'Загрузка заказов...', '⏳');
+    try {
+      const data = await Api.fetchPackOrders();
+      APP_STATE.packing.list = data;
+      renderPackList();
+    } catch (error) {
+      Utils.handleApiError(error, 'Сбой загрузки заказов для упаковки');
+      renderEmpty(list, 'Не удалось загрузить заказы', '⚠️');
+    }
+  }
+
+  function isPickedCompleteForPacking(order) {
+    const plan = Utils.safeNumber(order?.qty_plan, 0);
+    const picked = Utils.safeNumber(order?.qty_picked, 0);
+    return plan > 0 && picked >= plan;
+  }
+
+  function isOrderOnPackingTable(order) {
+    const status = String(order?.status || '').toUpperCase();
+    // На стол упаковки попадают только заказы, где отбор фактически завершён.
+    // Один статус ASSEMBLED недостаточен: в старых/тестовых данных он мог стоять при неполном отборе.
+    return status === 'ASSEMBLED' && isPickedCompleteForPacking(order);
+  }
+
+  function isOrderInPackingWork(order) {
+    const status = String(order?.status || '').toUpperCase();
+    return status === 'PACKING' || APP_STATE.packing.currentOrder?.id === order?.id;
+  }
+
+  function renderPackagingTable() {
+    const table = $('#packing-table-list');
+    if (!table) return;
+    const rows = Utils
+      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ['external_id', 'branch_name', 'pvz_code', 'route_number'])
+      .filter(isOrderOnPackingTable);
+
+    $('#pack-table-count').textContent = String(rows.length);
+
+    if (!rows.length) {
+      table.innerHTML = `
+        <div class="empty-state-card" style="grid-column:1/-1;text-align:center;color:var(--muted);">
+          <div style="font-size:36px;margin-bottom:8px;">✅</div>
+          <b>На столе нет заказов с завершённым отбором</b>
+          <p style="margin:6px 0 0;">Заказ появится здесь только когда по всем SKU отбор = план.</p>
+        </div>`;
+      return;
+    }
+
+    table.innerHTML = rows.map(order => {
+      const active = APP_STATE.packing.currentOrder?.id === order.id;
+      const qty = order.qty_plan ? `Отбор ${order.qty_picked || 0}/${order.qty_plan} · Упак ${order.qty_packaged || 0}/${order.qty_plan}` : 'READY';
+      return `
+        <button type="button" class="table-order-card${active ? ' active' : ''}" data-order-id="${Utils.escapeHTML(order.id)}">
+          <div class="table-order-id">#${Utils.escapeHTML(order.external_id)}</div>
+          <div class="table-order-dest">${Utils.escapeHTML(orderDestination(order))}</div>
+          <div class="table-order-footer">
+            <span class="mini-pill">${Utils.escapeHTML(qty)}</span>
+            <span class="mini-pill" style="background:var(--primary);color:white;">Взять в упаковку</span>
+          </div>
+        </button>`;
+    }).join('');
+
+    $$('.table-order-card', table).forEach(card => {
+      const order = rows.find(o => String(o.id) === String(card.dataset.orderId));
+      if (!order) return;
+      card.addEventListener('click', () => selectOrder(order));
+    });
+  }
+
+  function renderPackList() {
+    const list = $('#order-list');
+    const rows = Utils
+      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ['external_id', 'branch_name', 'pvz_code', 'route_number'])
+      .filter(isOrderInPackingWork);
+
+    $('#pack-count').textContent = String(rows.length);
+    $('#pack-work-count').textContent = String(rows.length);
+
+    if (!rows.length) {
+      renderEmpty(list, 'Нет заказов в работе. Берите новые заказы со стола упаковки справа.', '🧾');
+    } else {
+      list.innerHTML = '';
+      rows.forEach(order => {
+        const active = APP_STATE.packing.currentOrder?.id === order.id;
+        list.appendChild(createOrderCard(order, () => selectOrder(order), active));
+      });
+    }
+
+    renderPackagingTable();
+  }
+
+  async function selectOrder(order) {
+    if (APP_STATE.busy) return;
+    Utils.setBusy(true, 'Открытие заказа на упаковку...');
+    try {
+      const claimed = await Api.claimPackagingOrder(order.id);
+      APP_STATE.packing.currentOrder = claimed;
+      APP_STATE.packing.items = claimed.items || [];
+      renderPackList();
+      $('#pack-table-view').style.display = 'none';
+      $('#pack-main').style.display = 'block';
+      $('#pack-title').textContent = `Заказ #${claimed.external_id}`;
+      $('#pack-destination').textContent = `Назначение: ${orderDestination(claimed)}`;
+      renderPackItems();
+      setTimeout(() => $('#pack-barcode-input').focus(), 0);
+    } catch (error) {
+      Utils.handleApiError(error, 'Сбой открытия заказа на упаковку');
+      cancelPackSelection();
+    } finally {
+      Utils.setBusy(false);
+    }
+  }
+
+  function cancelPackSelection() {
+    APP_STATE.packing.currentOrder = null;
+    APP_STATE.packing.items = [];
+    $('#pack-main').style.display = 'none';
+    $('#pack-table-view').style.display = 'block';
+    renderPackList();
+  }
+
+  function renderPackItems() {
+    const list = $('#pack-items-list');
+    const items = APP_STATE.packing.items || [];
+    let total = 0;
+    let packed = 0;
+
+    const html = items.map(item => {
+      const qty = Utils.safeNumber(item.qty_plan ?? item.qty, 0);
+      const current = Utils.safeNumber(item.qty_packaged ?? item.current, 0);
+      total += qty;
+      packed += Math.min(current, qty);
+      const isDone = current >= qty && qty > 0;
+      const attrs = [item.attr1, item.attr2].filter(Boolean).join(' · ');
+      const pickedText = item.qty_picked !== undefined ? `Сборка: ${Utils.escapeHTML(item.qty_picked)}/${qty}` : '';
+
+      return `
+        <div class="item-row ${isDone ? 'checked' : ''}">
+          <div>
+            <div class="item-name">${Utils.escapeHTML(item.item_name || item.sku || 'Без названия')}</div>
+            <div class="item-sku">SKU: <b>${Utils.escapeHTML(item.sku)}</b>${attrs ? ` · ${Utils.escapeHTML(attrs)}` : ''}</div>
+            <div class="stock-locations"><span class="stock-pill">📦 ${pickedText || 'Проверка состава на столе упаковки'}</span></div>
+          </div>
+          <div class="qty-counter">
+            <div class="qty-big" style="color:${isDone ? 'var(--success)' : 'var(--text)'}">${current}/${qty}</div>
+            <div class="qty-label">упаковка</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    list.innerHTML = html || '<div class="empty-state-card">В заказе нет товаров.</div>';
+    const percent = total > 0 ? Math.round((packed / total) * 100) : 0;
+    $('#pack-progress-text').textContent = `${packed} / ${total}`;
+    $('#pack-progress-percent').textContent = `${percent}%`;
+    $('#pack-progress-bar').style.width = `${percent}%`;
+    $('#pack-sku-count').textContent = String(items.length);
+    $('#finish-btn').disabled = !(packed === total && total > 0);
+  }
+
+  async function processPackScan(rawValue) {
+    if (APP_STATE.busy) return Utils.showToast('Система занята, подождите...', 'warning');
+    const val = Utils.normalize(rawValue);
+    const input = $('#pack-barcode-input');
+    if (!val) return;
+    if (!APP_STATE.packing.currentOrder) {
+      Utils.showToast('Сначала выберите заказ', 'warning');
+      input.value = '';
+      return;
+    }
+
+    Utils.setBusy(true, 'Проверка SKU на упаковке...');
+    try {
+      const result = await Api.scanPackagingSku(APP_STATE.packing.currentOrder.id, val);
+      APP_STATE.packing.currentOrder = result.order;
+      APP_STATE.packing.items = result.order.items || [];
+      renderPackItems();
+      Utils.showToast(result.message || `SKU принят: ${val}`, 'success');
+      Utils.setInputState(input, 'ok');
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка скана упаковки');
+      Utils.setInputState(input, 'error');
+    } finally {
+      input.value = '';
+      Utils.setBusy(false);
+      // После setBusy(false) повторно пересчитываем кнопку завершения.
+      if (APP_STATE.packing.currentOrder) renderPackItems();
+      setTimeout(() => input.focus(), 0);
+    }
+  }
+
+  async function finishPacking() {
+    if (!APP_STATE.packing.currentOrder || APP_STATE.busy) return;
+    const total = APP_STATE.packing.items.reduce((sum, item) => sum + Utils.safeNumber(item.qty_plan ?? item.qty, 0), 0);
+    const packed = APP_STATE.packing.items.reduce((sum, item) => sum + Math.min(Utils.safeNumber(item.qty_packaged ?? item.current, 0), Utils.safeNumber(item.qty_plan ?? item.qty, 0)), 0);
+    if (packed !== total || total === 0) return Utils.showToast('Нельзя печатать этикетку: не все товары отсканированы на упаковке', 'warning');
+
+    const order = APP_STATE.packing.currentOrder;
+    Utils.setBusy(true, 'Завершение упаковки и подготовка QR...');
+    const btn = $('#finish-btn');
+    const prevText = btn.textContent;
+    btn.textContent = '⏳ Сохранение...';
+
+    try {
+      const result = await Api.finishPackaging(order.id);
+      const updatedOrder = result.order || order;
+      try { await Api.recordLabelPrint(updatedOrder.external_id, 'INITIAL'); } catch (historyError) { console.warn('Initial print history log failed', historyError); }
+      printOrderLabel(updatedOrder, result.label || updatedOrder.label);
+      await loadPrintHistory(updatedOrder.external_id, { silent: true });
+      Utils.showToast(`✅ Заказ #${updatedOrder.external_id} упакован, этикетка напечатана`, 'success');
+      cancelPackSelection();
+      await loadPackList({ force: true, silent: true });
+      await loadDispatchList({ force: true, silent: true });
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка завершения упаковки');
+    } finally {
+      btn.textContent = prevText;
+      Utils.setBusy(false);
+      renderPackItems();
+    }
+  }
+
+  function printOrderLabel(order, label = null) {
+    const qrPayload = label?.qr_payload || order?.label?.qr_payload || order.external_id;
+    const route = label?.route_number ?? order?.route_number ?? '—';
+    const pvz = label?.pvz_code || order?.pvz_code || orderDestination(order) || 'ПВЗ';
+    const phone = order?.phone ? `Тел: ${order.phone}` : '';
+    const box = label?.package_barcode || order?.package_barcode || order?.box_barcode || order?.box_id || '';
+
+    $('#lbl-route').textContent = route || '—';
+    $('#lbl-pvz').textContent = pvz;
+    $('#lbl-id').textContent = String(order.external_id || qrPayload);
+    $('#lbl-phone').textContent = phone;
+    $('#lbl-box').style.display = box ? 'block' : 'none';
+    $('#lbl-box').textContent = box ? `Пакет: ${box}` : '';
+    $('#lbl-date').textContent = new Date().toLocaleString();
+
+    const qrBox = $('#label-qr');
+    qrBox.innerHTML = '';
+    if (window.QRCode) {
+      new QRCode(qrBox, {
+        text: String(qrPayload),
+        width: 160,
+        height: 160,
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } else {
+      qrBox.textContent = String(qrPayload);
+    }
+    setTimeout(() => window.print(), 450);
+  }
+
+  function renderPrintHistory(payload) {
+    const container = $('#print-history-list');
+    const history = payload?.history || [];
+    if (!history.length) {
+      container.innerHTML = '<div class="empty-state-card" style="text-align:center;color:var(--muted);">Пока нет истории печати по этому заказу.</div>';
+      return;
+    }
+    container.innerHTML = history.map((row, idx) => `
+      <div class="print-history-row">
+        <div>
+          <b>${idx + 1}. ${Utils.escapeHTML(row.print_reason || 'PRINT')}</b>
+          <div><span>${Utils.escapeHTML(Utils.formatDateTime(row.printed_at))}</span></div>
+        </div>
+        <div style="text-align:right;">
+          <b>${Utils.escapeHTML(row.label_barcode || '—')}</b>
+          <div><span>${Utils.escapeHTML(row.station_id || '—')} · ${Utils.escapeHTML(row.printed_by || '—')}</span></div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function loadPrintHistory(externalId = null, options = {}) {
+    const input = $('#reprint-order-input');
+    const id = Utils.normalize(externalId || input.value);
+    if (!id) {
+      Utils.showToast('Введите ID заказа для просмотра истории', 'warning');
+      Utils.setInputState(input, 'error');
+      return null;
+    }
+    if (!externalId) input.value = id;
+    if (!options.silent) Utils.setBusy(true, 'Загрузка истории печати...');
+    try {
+      const payload = await Api.getLabelPrintHistory(id);
+      renderPrintHistory(payload);
+      return payload;
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка загрузки истории печати');
+      return null;
+    } finally {
+      if (!options.silent) Utils.setBusy(false);
+    }
+  }
+
+  async function reprintLabelByOrder() {
+    if (APP_STATE.busy) return;
+    const input = $('#reprint-order-input');
+    const externalId = Utils.normalize(input.value);
+    if (!externalId) {
+      Utils.showToast('Введите ID заказа для повторной печати', 'warning');
+      Utils.setInputState(input, 'error');
+      return;
+    }
+    Utils.setBusy(true, 'Повторная печать этикетки...');
+    try {
+      const result = await Api.reprintShippingLabel(externalId);
+      const order = result.order || { external_id: externalId };
+      printOrderLabel(order, result.label || order.label);
+      await loadPrintHistory(externalId, { silent: true });
+      Utils.showToast(`🖨 Этикетка заказа #${externalId} отправлена на повторную печать`, 'success');
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка повторной печати');
+    } finally {
+      Utils.setBusy(false);
+      setTimeout(() => input.focus(), 0);
+    }
+  }
+
+  async function loadDispatchList(options = {}) {
+    if (APP_STATE.busy && !options.force) return;
+    const list = $('#dispatch-list');
+    if (!options.silent) renderEmpty(list, 'Загрузка заказов...', '⏳');
+    try {
+      const data = await Api.fetchDispatchOrders();
+      APP_STATE.dispatch.availableOrders = data.filter(o => !APP_STATE.dispatch.currentBox.some(b => b.id === o.id));
+      renderDispatchLeftList();
+    } catch (error) {
+      Utils.handleApiError(error, 'Сбой загрузки заказов на отгрузку');
+      renderEmpty(list, 'Не удалось загрузить заказы', '⚠️');
+    }
+  }
+
+  function renderDispatchLeftList() {
+    const list = $('#dispatch-list');
+    const rows = Utils.filterRows(APP_STATE.dispatch.availableOrders, APP_STATE.dispatch.search, ['external_id', 'branch_name', 'pvz_code', 'route_number']);
+    $('#dispatch-count').textContent = String(rows.length);
+    if (!rows.length) return renderEmpty(list, 'Нет заказов для отгрузки', '✅');
+    list.innerHTML = '';
+    rows.forEach(order => {
+      const card = createOrderCard(order, () => {
+        if (!APP_STATE.dispatch.boxId) {
+          Utils.showToast('Сначала зафиксируйте ящик', 'warning');
+          $('#dispatch-box-input').focus();
+          return;
+        }
+        processDispatchScan(order.external_id);
+      });
+      const actions = document.createElement('div');
+      actions.className = 'table-actions';
+      actions.style.marginTop = '10px';
+      actions.innerHTML = `
+        <button type="button" class="btn btn-outline btn-small" data-reprint="${Utils.escapeHTML(order.external_id)}">🖨 Печать</button>
+        <button type="button" class="btn btn-outline btn-small" data-history="${Utils.escapeHTML(order.external_id)}">История</button>`;
+      actions.querySelector('[data-reprint]').addEventListener('click', (event) => {
+        event.stopPropagation();
+        $('#reprint-order-input').value = order.external_id;
+        reprintLabelByOrder();
+      });
+      actions.querySelector('[data-history]').addEventListener('click', (event) => {
+        event.stopPropagation();
+        $('#reprint-order-input').value = order.external_id;
+        loadPrintHistory(order.external_id);
+      });
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
+  }
+
+  function lockDispatchBox() {
+    if (APP_STATE.busy) return;
+    const input = $('#dispatch-box-input');
+    const val = Utils.normalize(input.value);
+    if (!val) {
+      Utils.showToast('Введите или отсканируйте штрихкод ящика', 'warning');
+      Utils.setInputState(input, 'error');
+      return;
+    }
+    APP_STATE.dispatch.boxId = val;
+    APP_STATE.dispatch.currentBox = [];
+    APP_STATE.dispatch.boxDestination = null;
+    $('#dispatch-setup-area').style.display = 'none';
+    $('#dispatch-scan-area').style.display = 'block';
+    $('#current-box-display').textContent = val;
+    $('#current-box-destination').textContent = 'ПВЗ: будет определен первым заказом';
+    renderDispatchBox();
+    setTimeout(() => $('#dispatch-barcode-input').focus(), 0);
+  }
+
+  function unlockDispatchBox() {
+    if (APP_STATE.busy) return;
+    if (APP_STATE.dispatch.currentBox.length > 0 && !confirm('В ящике есть заказы. Сбросить текущий ящик?')) return;
+    APP_STATE.dispatch.boxId = null;
+    APP_STATE.dispatch.currentBox = [];
+    APP_STATE.dispatch.boxDestination = null;
+    $('#dispatch-setup-area').style.display = 'block';
+    $('#dispatch-scan-area').style.display = 'none';
+    $('#dispatch-box-input').value = '';
+    $('#dispatch-barcode-input').value = '';
+    $('#current-box-display').textContent = '—';
+    renderDispatchBox();
+    loadDispatchList({ force: true, silent: true });
+    setTimeout(() => $('#dispatch-box-input').focus(), 0);
+  }
+
+  function processDispatchScan(rawValue) {
+    if (APP_STATE.busy) return Utils.showToast('Система занята, подождите...', 'warning');
+    const val = Utils.normalize(rawValue);
+    const input = $('#dispatch-barcode-input');
+    if (!val) return;
+    if (!APP_STATE.dispatch.boxId) {
+      Utils.showToast('Сначала зафиксируйте ящик', 'warning');
+      $('#dispatch-box-input').focus();
+      return;
+    }
+    if (APP_STATE.dispatch.currentBox.length >= CONFIG.MAX_BOX_ITEMS) {
+      Utils.showToast(`Лимит ящика: ${CONFIG.MAX_BOX_ITEMS} заказов`, 'error');
+      Utils.setInputState(input, 'error');
+      return;
+    }
+    if (APP_STATE.dispatch.currentBox.some(o => String(o.external_id) === val)) {
+      Utils.showToast(`Заказ уже в текущем ящике: ${val}`, 'warning');
+      Utils.setInputState(input, 'error');
+      input.value = '';
+      return;
+    }
+
+    const idx = APP_STATE.dispatch.availableOrders.findIndex(o => String(o.external_id) === val);
+    if (idx === -1) {
+      Utils.showToast(`Заказ не найден в PACKED: ${val}`, 'error');
+      Utils.setInputState(input, 'error');
+      input.value = '';
+      return;
+    }
+
+    const order = APP_STATE.dispatch.availableOrders[idx];
+    const dest = orderDestination(order);
+    if (APP_STATE.dispatch.boxDestination && APP_STATE.dispatch.boxDestination !== dest) {
+      Utils.showToast(`Нельзя смешивать ПВЗ: ящик для «${APP_STATE.dispatch.boxDestination}», заказ для «${dest}»`, 'error');
+      Utils.setInputState(input, 'error');
+      input.value = '';
+      return;
+    }
+
+    APP_STATE.dispatch.boxDestination = dest;
+    APP_STATE.dispatch.currentBox.push(order);
+    APP_STATE.dispatch.availableOrders.splice(idx, 1);
+    $('#current-box-destination').textContent = `ПВЗ: ${dest}`;
+    Utils.showToast(`✅ Добавлен заказ #${val}`, 'success');
+    Utils.setInputState(input, 'ok');
+    input.value = '';
+    renderDispatchLeftList();
+    renderDispatchBox();
+  }
+
+  function renderDispatchBox() {
+    const boxCont = $('#current-box-items');
+    const count = APP_STATE.dispatch.currentBox.length;
+    $('#box-total-count').textContent = `${count} шт.`;
+    $('#dispatch-btn').disabled = count === 0 || !APP_STATE.dispatch.boxId || APP_STATE.busy;
+
+    if (!count) {
+      boxCont.innerHTML = '<div class="empty-state-card" style="margin:12px; text-align:center; color:var(--muted);">Ящик пуст.</div>';
+      return;
+    }
+    boxCont.innerHTML = APP_STATE.dispatch.currentBox.map((o, index) => `
+      <div class="box-item-row">
+        <div><b>${index + 1}. #${Utils.escapeHTML(o.external_id)}</b><div style="color:var(--muted);font-size:12px;margin-top:3px;">${Utils.escapeHTML(orderDestination(o))}</div></div>
+        <span class="mini-pill" style="background:var(--success-soft); color:var(--success);">✅ scanned</span>
+      </div>`).join('');
+  }
+
+  async function shipCurrentBox() {
+    if (APP_STATE.busy) return;
+    if (!APP_STATE.dispatch.boxId || !APP_STATE.dispatch.currentBox.length) {
+      return Utils.showToast('Нет заказов для отгрузки', 'warning');
+    }
+
+    const boxId = APP_STATE.dispatch.boxId;
+    const orders = [...APP_STATE.dispatch.currentBox];
+    Utils.setBusy(true, 'Отгрузка ящика...');
+    const btn = $('#dispatch-btn');
+    const prevText = btn.textContent;
+    btn.textContent = '⏳ Отгрузка...';
+    try {
+      await Api.shipBox(boxId, orders);
+      Utils.showToast(`✅ Ящик ${boxId}: отгружено ${orders.length} заказов`, 'success');
+      APP_STATE.dispatch.boxId = null;
+      APP_STATE.dispatch.currentBox = [];
+      APP_STATE.dispatch.boxDestination = null;
+      $('#dispatch-setup-area').style.display = 'block';
+      $('#dispatch-scan-area').style.display = 'none';
+      $('#dispatch-box-input').value = '';
+      $('#dispatch-barcode-input').value = '';
+      renderDispatchBox();
+      await loadDispatchList({ force: true, silent: true });
+      setTimeout(() => $('#dispatch-box-input').focus(), 0);
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка отгрузки');
+    } finally {
+      btn.textContent = prevText;
+      Utils.setBusy(false);
+      renderDispatchBox();
+    }
+  }
+
+  async function processInbound() {
+    if (APP_STATE.busy) return;
+    const skuInput = $('#inb-sku');
+    const qtyInput = $('#inb-qty');
+    const cellInput = $('#inb-cell');
+    const sku = Utils.normalize(skuInput.value);
+    const qty = parseInt(qtyInput.value, 10);
+    const cell = Utils.normalize(cellInput.value).toUpperCase();
+
+    if (!sku || !qty || !cell) {
+      Utils.showToast('Заполните SKU, количество и ячейку', 'warning');
+      if (!sku) Utils.setInputState(skuInput, 'error');
+      if (!qty) Utils.setInputState(qtyInput, 'error');
+      if (!cell) Utils.setInputState(cellInput, 'error');
+      return;
+    }
+    if (qty <= 0) return Utils.showToast('Количество должно быть больше 0', 'error');
+    if (qty > 500 && !confirm(`Вы уверены, что принимаете ${qty} шт.?`)) return;
+
+    Utils.setBusy(true, 'Приемка товара...');
+    const btn = $('#btn-inbound');
+    const prevText = btn.textContent;
+    btn.textContent = '⏳ Обработка...';
+    try {
+      const result = await Api.inboundStock(sku, cell, qty);
+      const resultingQty = result?.resulting_qty;
+      const suffix = resultingQty !== undefined && resultingQty !== null ? ` · остаток ${resultingQty}` : '';
+      Utils.showToast(`✅ Принято: ${sku} × ${qty} → ${cell}${suffix}`, 'success');
+      APP_STATE.inbound.logs.unshift({ sku, qty, cell, time: new Date() });
+      APP_STATE.inbound.logs = APP_STATE.inbound.logs.slice(0, 10);
+      renderInboundLog();
+      skuInput.value = '';
+      qtyInput.value = '';
+      cellInput.value = cell;
+      setTimeout(() => skuInput.focus(), 0);
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка приемки');
+    } finally {
+      btn.textContent = prevText;
+      Utils.setBusy(false);
+    }
+  }
+
+  function renderInboundLog() {
+    $('#inb-log').innerHTML = APP_STATE.inbound.logs.map(row => `
+      <li>✅ <b>${Utils.escapeHTML(row.sku)}</b> — ${Utils.escapeHTML(row.qty)} шт. → <b>${Utils.escapeHTML(row.cell)}</b> <span style="opacity:.7">${row.time.toLocaleTimeString()}</span></li>`
+    ).join('');
+  }
+
+  async function loadLogs(options = {}) {
+    if (APP_STATE.busy && !options.force) return;
+    const tbody = $('#logs-table-body');
+    if (!options.silent) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
+    try {
+      APP_STATE.logs.rows = await Api.fetchLogs();
+      renderLogs();
+    } catch (error) {
+      Utils.handleApiError(error, 'Сбой загрузки журнала');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
+    }
+  }
+
+  function renderLogs() {
+    const tbody = $('#logs-table-body');
+    const rows = Utils.filterRows(APP_STATE.logs.rows, APP_STATE.logs.search, ['sku', 'cell', 'cell_code', 'reference_id', 'reference_external_id', 'operation_type', 'movement_type', 'operator_id', 'note']);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Нет данных</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(l => {
+      const opType = l.operation_type || l.movement_type || l.type;
+      const isIn = String(opType).toUpperCase().includes('INBOUND') || String(opType).toUpperCase().includes('RECEIVE');
+      return `<tr>
+        <td style="color:var(--muted);">${Utils.formatDateTime(l.created_at)}</td>
+        <td><b>${Utils.escapeHTML(l.sku)}</b></td>
+        <td>${Utils.escapeHTML(l.cell || l.cell_code || '—')}</td>
+        <td><span class="mini-pill" style="background:${isIn ? 'var(--success-soft)' : 'var(--danger-soft)'}; color:${isIn ? 'var(--success)' : 'var(--danger)'};">${Utils.escapeHTML(opType || (isIn ? 'INBOUND' : 'OUTBOUND'))}</span></td>
+        <td><b>${(l.qty_change ?? l.qty_delta ?? 0) > 0 ? '+' : ''}${Utils.escapeHTML(l.qty_change ?? l.qty_delta ?? 0)}</b></td>
+        <td><b style="color:var(--primary);">${l.resulting_qty !== null && l.resulting_qty !== undefined ? `${Utils.escapeHTML(l.resulting_qty)} шт.` : (l.qty_after !== undefined ? `${Utils.escapeHTML(l.qty_after)} шт.` : '—')}</b></td>
+        <td style="color:var(--muted);">${Utils.escapeHTML(l.reference_id || l.reference_external_id || l.note || '—')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const STATUS_MAP = [
+    { key: 'TOTAL', label: 'Все заказы', color: '#111827', isTotal: true },
+    { key: 'NEW', label: 'Новые', color: '#f59e0b' },
+    { key: 'ASSEMBLING', label: 'Собираются', color: '#fb923c' },
+    { key: 'ASSEMBLED', label: 'Собрано', color: '#2563eb' },
+    { key: 'PACKING', label: 'На упаковке', color: '#0891b2' },
+    { key: 'PACKED', label: 'Упаковано', color: '#7000ff' },
+    { key: 'SHIPPED', label: 'В пути', color: '#5856d6' },
+    { key: 'ARRIVED_AT_PVZ', label: 'На ПВЗ', color: '#16a34a' },
+    { key: 'COMPLETED', label: 'Выдано', color: '#64748b' },
+    { key: 'RETURNED_BEFORE_ISSUE', label: 'Возврат до выдачи', color: '#dc2626' },
+    { key: 'RETURNED_AFTER_ISSUE', label: 'Возврат после выдачи', color: '#991b1b' }
+  ];
+
+  async function loadDashboardData(options = {}) {
+    if (APP_STATE.busy && !options.force) return;
+    const grid = $('#stats-grid');
+    if (!options.silent) grid.innerHTML = '<div class="empty-state-card">Загрузка...</div>';
+    try {
+      const rpcData = await Api.fetchStats();
+      APP_STATE.dashboard.counts = Object.fromEntries((rpcData || []).map(r => [r.status, Number(r.cnt)]));
+      renderDashboard();
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка дашборда');
+      grid.innerHTML = '<div class="empty-state-card" style="color:var(--danger);">Ошибка загрузки дашборда</div>';
+    }
+  }
+
+  function renderDashboard() {
+    const grid = $('#stats-grid');
+    const counts = APP_STATE.dashboard.counts;
+    const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+    grid.innerHTML = '';
+    STATUS_MAP.forEach(info => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'stat-card';
+      card.style.borderTopColor = info.color;
+      const value = info.isTotal ? total : (counts[info.key] || 0);
+      card.innerHTML = `
+        <div class="stat-label">${Utils.escapeHTML(info.label)}</div>
+        <div class="stat-value" style="color:${info.isTotal ? '#111827' : info.color};">${value}</div>
+        <div class="stat-link">Посмотреть список →</div>`;
+      card.addEventListener('click', () => openDashboardDetails(info.key, info.label));
+      grid.appendChild(card);
+    });
+  }
+
+  function closeDashboardDetails() {
+    $('#dashboard-details-view').style.display = 'none';
+    $('#dashboard-main-view').style.display = 'block';
+    APP_STATE.dashboard.activeStatusKey = null;
+    APP_STATE.dashboard.activeStatusLabel = null;
+    APP_STATE.dashboard.detailsRows = [];
+    APP_STATE.dashboard.detailSearch = '';
+    $('#dashboard-detail-search').value = '';
+  }
+
+  async function openDashboardDetails(statusKey, statusLabel, options = {}) {
+    if (APP_STATE.busy && !options.silent) return;
+    APP_STATE.dashboard.activeStatusKey = statusKey;
+    APP_STATE.dashboard.activeStatusLabel = statusLabel;
+    $('#dashboard-main-view').style.display = 'none';
+    $('#dashboard-details-view').style.display = 'block';
+    $('#details-view-title').textContent = statusLabel;
+    $('#details-table-head').innerHTML = `<tr>
+      <th>ID Заказа</th><th>Назначение</th><th>Контакт</th><th>Ящик</th><th>Дата</th>
+    </tr>`;
+    if (!options.silent) $('#details-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
+
+    try {
+      APP_STATE.dashboard.detailsRows = await Api.fetchOrderDetails(statusKey);
+      renderDashboardDetails();
+    } catch (error) {
+      Utils.handleApiError(error, 'Сбой детализации');
+      $('#details-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
+    }
+  }
+
+  function renderDashboardDetails() {
+    const tbody = $('#details-table-body');
+    const rows = Utils.filterRows(APP_STATE.dashboard.detailsRows, APP_STATE.dashboard.detailSearch, ['external_id', 'branch_name', 'pvz_code', 'route_number', 'phone', 'box_id', 'box_barcode', 'status']);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(o => `
+      <tr>
+        <td><b>${Utils.escapeHTML(o.external_id)}</b></td>
+        <td>${Utils.escapeHTML(orderDestination(o))}</td>
+        <td>${Utils.escapeHTML(o.phone || '—')}</td>
+        <td>${(o.box_id || o.box_barcode) ? `<span class="mini-pill">📦 ${Utils.escapeHTML(o.box_id || o.box_barcode)}</span>` : '—'}</td>
+        <td style="color:var(--muted);">${Utils.formatDateTime(o.created_at)}</td>
+      </tr>`).join('');
+  }
+
+  class HardwareScanner {
+    constructor(callback) {
+      this.buffer = '';
+      this.timeout = null;
+      this.callback = callback;
+      document.addEventListener('keydown', (event) => this.handleKeydown(event), true);
+    }
+
+    handleKeydown(event) {
+      const overlayVisible = $('#login-overlay').style.display !== 'none';
+      if (overlayVisible) return;
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+      // Если фокус в поле ввода — пусть поле само обработает Enter, чтобы не было двойного сканирования.
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isInputFocused = ['input', 'textarea', 'select'].includes(tag);
+      if (isInputFocused) return;
+
+      if (event.key === 'Enter') {
+        if (this.buffer.length > 2) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.callback(this.buffer);
+        }
+        this.buffer = '';
+        return;
+      }
+      if (event.key.length === 1) {
+        this.buffer += event.key;
+        clearTimeout(this.timeout);
+        this.timeout = setTimeout(() => { this.buffer = ''; }, 80);
+      }
+    }
+  }
+
+  new HardwareScanner((barcode) => {
+    if (APP_STATE.currentView === 'packing') processPackScan(barcode);
+    if (APP_STATE.currentView === 'dispatch') {
+      if (!APP_STATE.dispatch.boxId) {
+        $('#dispatch-box-input').value = barcode;
+        lockDispatchBox();
+      } else {
+        processDispatchScan(barcode);
+      }
+    }
+    if (APP_STATE.currentView === 'inbound') {
+      $('#inb-sku').value = barcode;
+      $('#inb-qty').focus();
+    }
+  });
+
+  function switchView(target) {
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $$('.nav-tab').forEach(tab => {
+      const active = tab.dataset.target === target;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
+    $(`#view-${target}`).classList.add('active');
+    APP_STATE.currentView = target;
+
+    if (target === 'packing') loadPackList({ silent: true });
+    if (target === 'dispatch') loadDispatchList({ silent: true });
+    if (target === 'inbound') setTimeout(() => $('#inb-sku').focus(), 0);
+    if (target === 'logs') loadLogs();
+    if (target === 'dashboard') { closeDashboardDetails(); loadDashboardData(); }
+  }
+
+  async function doLogin() {
+    const email = Utils.normalize($('#login-email').value);
+    const password = $('#login-password').value;
+    const btn = $('#login-btn');
+    const err = $('#login-error');
+
+    if (!email || !password) {
+      err.textContent = 'Введите email и пароль';
+      err.classList.add('visible');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Вход...';
+    err.classList.remove('visible');
+
+    try {
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      const manager = await Api.getManager(data.user.id);
+      if (!manager) {
+        await db.auth.signOut();
+        throw new Error('Пользователь не найден в managers. Обратитесь к администратору.');
+      }
+      applySession(data.session, manager);
+    } catch (error) {
+      err.textContent = error.message === 'Invalid login credentials' ? 'Неверный email или пароль' : error.message;
+      err.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Войти в систему';
+    }
+  }
+
+  async function doLogout() {
+    await db.auth.signOut();
+    APP_STATE.session = null;
+    APP_STATE.manager = null;
+    $('#user-info').innerHTML = '<span class="status-pill"><span class="status-dot"></span> Online</span><span>Station #1</span>';
+    $('#login-overlay').style.display = 'flex';
+    $('#login-email').value = '';
+    $('#login-password').value = '';
+    $('#login-btn').disabled = false;
+    $('#login-btn').textContent = 'Войти в систему';
+    $('#login-error').classList.remove('visible');
+    setTimeout(() => $('#login-email').focus(), 100);
+  }
+
+  function applySession(session, manager) {
+    APP_STATE.session = session;
+    APP_STATE.manager = manager;
+    const safeRole = String(manager.role || 'operator').toUpperCase();
+    $('#user-info').innerHTML = `
+      <span class="status-pill"><span class="status-dot"></span> Online</span>
+      <span>${Utils.escapeHTML(manager.full_name || 'Оператор')}</span>
+      <span class="role-pill">${Utils.escapeHTML(safeRole)}</span>
+      <button class="logout-btn" id="logout-btn" data-no-busy-lock="true">Выйти</button>`;
+    $('#logout-btn').addEventListener('click', doLogout);
+    $('#login-overlay').style.display = 'none';
+    switchView(APP_STATE.currentView || 'packing');
+  }
+
+  async function checkSession() {
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      if (session) {
+        const manager = await Api.getManager(session.user.id);
+        if (manager) {
+          applySession(session, manager);
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('Session check failed', error);
+    }
+    setTimeout(() => $('#login-email').focus(), 150);
+  }
+
+  function bindEvents() {
+    $$('.nav-tab').forEach(tab => tab.addEventListener('click', () => switchView(tab.dataset.target)));
+
+    $('#login-btn').addEventListener('click', doLogin);
+    $('#login-email').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        $('#login-password').focus();
+      }
+    });
+    $('#login-password').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        doLogin();
+      }
+    });
+
+    $('#pack-search').addEventListener('input', (event) => {
+      APP_STATE.packing.search = event.target.value;
+      renderPackList();
+    });
+    $('#btn-pack-refresh').addEventListener('click', () => loadPackList({ force: true }));
+    $('#btn-pack-table-refresh').addEventListener('click', () => loadPackList({ force: true }));
+    $('#btn-cancel-pack').addEventListener('click', cancelPackSelection);
+    $('#btn-pack-manual').addEventListener('click', () => processPackScan($('#pack-barcode-input').value));
+    $('#pack-barcode-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        processPackScan(event.target.value);
+      }
+    });
+    $('#finish-btn').addEventListener('click', finishPacking);
+
+    $('#dispatch-search').addEventListener('input', (event) => {
+      APP_STATE.dispatch.search = event.target.value;
+      renderDispatchLeftList();
+    });
+    $('#btn-dispatch-refresh').addEventListener('click', () => loadDispatchList({ force: true }));
+    $('#lock-box-btn').addEventListener('click', lockDispatchBox);
+    $('#unlock-box-btn').addEventListener('click', unlockDispatchBox);
+    $('#dispatch-box-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        lockDispatchBox();
+      }
+    });
+    $('#dispatch-barcode-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        processDispatchScan(event.target.value);
+      }
+    });
+    $('#dispatch-btn').addEventListener('click', shipCurrentBox);
+    $('#btn-reprint-label').addEventListener('click', reprintLabelByOrder);
+    $('#btn-load-print-history').addEventListener('click', () => loadPrintHistory());
+    $('#reprint-order-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        reprintLabelByOrder();
+      }
+    });
+
+    $('#btn-inbound').addEventListener('click', processInbound);
+    $('#btn-clear-inbound-cell').addEventListener('click', () => { $('#inb-cell').value = ''; $('#inb-cell').focus(); });
+    $('#inb-sku').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); $('#inb-qty').focus(); } });
+    $('#inb-qty').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); $('#inb-cell').focus(); } });
+    $('#inb-cell').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); processInbound(); } });
+
+    $('#btn-logs-refresh').addEventListener('click', () => loadLogs({ force: true }));
+    $('#logs-search').addEventListener('input', (event) => {
+      APP_STATE.logs.search = event.target.value;
+      renderLogs();
+    });
+
+    $('#btn-dashboard-refresh').addEventListener('click', () => loadDashboardData({ force: true }));
+    $('#btn-dash-back').addEventListener('click', closeDashboardDetails);
+    $('#dashboard-detail-search').addEventListener('input', (event) => {
+      APP_STATE.dashboard.detailSearch = event.target.value;
+      renderDashboardDetails();
+    });
+  }
+
+  setInterval(() => {
+    if (!navigator.onLine || APP_STATE.busy || $('#login-overlay').style.display !== 'none') return;
+    if (APP_STATE.currentView === 'packing' && !APP_STATE.packing.currentOrder) loadPackList({ silent: true });
+    if (APP_STATE.currentView === 'dispatch' && !APP_STATE.dispatch.boxId) loadDispatchList({ silent: true });
+    if (APP_STATE.currentView === 'dashboard') {
+      loadDashboardData({ silent: true });
+      if ($('#dashboard-details-view').style.display === 'block' && APP_STATE.dashboard.activeStatusKey) {
+        openDashboardDetails(APP_STATE.dashboard.activeStatusKey, APP_STATE.dashboard.activeStatusLabel, { silent: true });
+      }
+    }
+  }, CONFIG.REFRESH_RATE_MS);
+
+  bindEvents();
+  renderDispatchBox();
+  checkSession();
+</script>
+</body>
+</html>
