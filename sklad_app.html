@@ -1568,7 +1568,7 @@
 
     try {
       const result = await Api.finishPackaging(order.id);
-      const updatedOrder = result.order || order;
+      const updatedOrder = { ...order, ...(result.order || {}) };
       try { await Api.recordLabelPrint(updatedOrder.external_id, 'INITIAL'); } catch (historyError) { console.warn('Initial print history log failed', historyError); }
       printOrderLabel(updatedOrder, result.label || updatedOrder.label);
       await loadPrintHistory(updatedOrder.external_id, { silent: true });
@@ -1669,7 +1669,9 @@
     Utils.setBusy(true, 'Повторная печать этикетки...');
     try {
       const result = await Api.reprintShippingLabel(externalId);
-      const order = result.order || { external_id: externalId };
+      const baseOrder = APP_STATE.packing.currentOrder?.external_id === externalId
+  ? APP_STATE.packing.currentOrder : {};
+const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
       printOrderLabel(order, result.label || order.label);
       await loadPrintHistory(externalId, { silent: true });
       Utils.showToast(`🖨 Этикетка заказа #${externalId} отправлена на повторную печать`, 'success');
