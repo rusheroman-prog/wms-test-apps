@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uzum WMS — Станция обработки v4.3.1.1</title>
+  <title>Uzum WMS — Станция обработки v4.5</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <style>
@@ -104,7 +104,7 @@
       color: #111827;
       border-color: rgba(255,255,255,0.2);
     }
-    .nav-tab:focus-visible, .btn:focus-visible, input:focus-visible, .stat-card:focus-visible, .order-card:focus-visible {
+    .nav-tab:focus-visible, .btn:focus-visible, input:focus-visible, .order-card:focus-visible, .filter-chip:focus-visible {
       outline: 3px solid rgba(112,0,255,0.35);
       outline-offset: 2px;
     }
@@ -503,22 +503,47 @@
     td { font-size: 14px; }
     tr:last-child td { border-bottom: 0; }
 
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-    .stat-card {
-      background: white;
-      padding: 20px;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-soft);
-      cursor: pointer;
-      transition: 0.18s ease;
-      border: 1px solid #e8edf5;
-      border-top: 6px solid var(--primary);
-      text-align: left;
+    /* ── Дашборд: чипы-фильтры по статусам ─────────────────────────────── */
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 4px 0 6px;
     }
-    .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-    .stat-label { color: var(--muted); font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.35px; }
-    .stat-value { font-size: 42px; font-weight: 950; margin-top: 8px; line-height: 1; }
-    .stat-link { margin-top: 14px; font-size: 13px; color: var(--primary); font-weight: 950; }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      background: white;
+      font-weight: 850;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: 0.15s ease;
+      white-space: nowrap;
+    }
+    .filter-chip:hover { border-color: rgba(112,0,255,0.42); color: var(--text); transform: translateY(-1px); }
+    .filter-chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+      box-shadow: 0 6px 16px rgba(112,0,255,0.22);
+    }
+    .filter-chip .chip-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.06);
+      font-size: 12px;
+      font-weight: 950;
+    }
+    .filter-chip.active .chip-count { background: rgba(255,255,255,0.22); }
 
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
     .table-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -899,31 +924,33 @@
 
     <section id="view-dashboard" class="view" role="tabpanel" aria-label="Мониторинг">
       <div class="main-panel" style="width:100%;">
-        <div id="dashboard-main-view">
-          <div class="toolbar">
-            <div>
-              <h1 class="panel-title">Мониторинг заказов и статусов</h1>
-              <p class="panel-subtitle">Данные берутся через RPC get_sklad_dashboard_v1. Нажмите на карточку, чтобы открыть список заказов по статусу.</p>
-            </div>
+        <div class="toolbar">
+          <div>
+            <h1 class="panel-title">Заказы и статусы</h1>
+            <p class="panel-subtitle">Общий список заказов через RPC get_sklad_order_details_v1. Кликните чип, чтобы отфильтровать по статусу. Поиск работает по ID, ПВЗ, телефону и ящику.</p>
+          </div>
+          <div class="table-actions">
+            <input type="search" id="dashboard-search" class="search-input" style="width:280px;" placeholder="Фильтр по ID / ПВЗ / телефону / ящику" />
             <button class="btn btn-outline" id="btn-dashboard-refresh">↻ Обновить</button>
           </div>
-          <div id="stats-grid" class="stats-grid"></div>
         </div>
 
-        <div id="dashboard-details-view" class="page-card" style="display:none;">
-          <div class="toolbar">
-            <div class="table-actions">
-              <button class="btn btn-outline" id="btn-dash-back">⬅ Назад</button>
-              <h2 id="details-view-title" style="margin:0;">Детализация</h2>
-            </div>
-            <input type="search" id="dashboard-detail-search" class="search-input" style="width:280px;" placeholder="Фильтр по ID / ПВЗ / ящику" />
-          </div>
-          <div class="data-table-wrap">
-            <table>
-              <thead id="details-table-head"></thead>
-              <tbody id="details-table-body"></tbody>
-            </table>
-          </div>
+        <div id="dashboard-filter-chips" class="filter-chips"></div>
+
+        <div class="data-table-wrap" style="margin-top:14px;">
+          <table>
+            <thead>
+              <tr>
+                <th>ID Заказа</th>
+                <th>Статус</th>
+                <th>Назначение</th>
+                <th>Контакт</th>
+                <th>Ящик</th>
+                <th>Дата</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-table-body"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -950,9 +977,7 @@
     MAX_BOX_ITEMS: 50,
     REFRESH_RATE_MS: 20000,
     LOG_LIMIT: 100,
-    DETAILS_LIMIT: 300,
-    // Версия v4: упаковка идёт через RPC claim_order_for_packaging / scan_packaging_sku / finish_packaging_order.
-    // Скан каждой штуки фиксируется в БД, печать QR доступна только при qty_packaged = qty_plan.
+    DETAILS_LIMIT: 2000,
     USE_STRONG_RPC_WHEN_AVAILABLE: true
   };
 
@@ -978,10 +1003,9 @@
     logs: { rows: [], search: '' },
     dashboard: {
       counts: {},
-      detailsRows: [],
-      activeStatusKey: null,
-      activeStatusLabel: null,
-      detailSearch: ''
+      rows: [],
+      activeStatus: 'TOTAL',
+      search: ''
     },
     rpcAvailability: {}
   };
@@ -1216,7 +1240,6 @@
     },
 
     async fetchLogs() {
-      // Совместимость: новая SQL-схема использует stock_movements, старая — stock_log.
       let response = await db.from('stock_movements')
         .select('*')
         .order('created_at', { ascending: false })
@@ -1247,8 +1270,7 @@
 
     async fetchOrderDetails(statusKey) {
       // Детализация должна идти через SECURITY DEFINER RPC.
-      // Иначе при включённом RLS карточки мониторинга показывают счётчики,
-      // но прямой select из customer_orders возвращает 0 строк без ошибки.
+      // Иначе при включённом RLS дашборд показывает счётчики, но прямой select из customer_orders возвращает 0 строк без ошибки.
       const detailsRpc = await Api.rpcOptional('get_sklad_order_details_v1', {
         p_status: statusKey,
         p_limit: CONFIG.DETAILS_LIMIT
@@ -1304,37 +1326,6 @@
     }
   };
 
-  function choosePickLocation(item) {
-    const locations = item.stockLocations || [];
-    if (!locations.length) return { cell: item.cellInfo || 'Нет на полке', qty: null };
-    const enough = locations.find(loc => loc.qty === null || loc.qty === undefined ? false : Number(loc.qty) >= Number(item.qty));
-    if (enough) return enough;
-    return locations[0];
-  }
-
-  function buildStockMap(stockData) {
-    const map = new Map();
-    for (const row of stockData || []) {
-      const sku = String(row.sku ?? '');
-      if (!sku) continue;
-      if (!map.has(sku)) map.set(sku, []);
-      map.get(sku).push({
-        cell: row.cell || 'Нет ячейки',
-        qty: row.qty_on_hand !== undefined ? Utils.safeNumber(row.qty_on_hand, null) : (row.qty === undefined ? null : Utils.safeNumber(row.qty, null)),
-        reserved: row.qty_reserved === undefined ? null : Utils.safeNumber(row.qty_reserved, 0)
-      });
-    }
-    for (const locations of map.values()) {
-      locations.sort((a, b) => {
-        const aq = a.qty ?? -1;
-        const bq = b.qty ?? -1;
-        if (aq !== bq) return aq - bq;
-        return String(a.cell).localeCompare(String(b.cell));
-      });
-    }
-    return map;
-  }
-
   function orderDestination(order) {
     if (!order) return '—';
     if (order.branch_name) return order.branch_name;
@@ -1372,6 +1363,7 @@
       </div>`;
   }
 
+  // ── PACKING ──────────────────────────────────────────────────────────────
   async function loadPackList(options = {}) {
     if (APP_STATE.busy && !options.force) return;
     const list = $('#order-list');
@@ -1394,8 +1386,6 @@
 
   function isOrderOnPackingTable(order) {
     const status = String(order?.status || '').toUpperCase();
-    // На стол упаковки попадают только заказы, где отбор фактически завершён.
-    // Один статус ASSEMBLED недостаточен: в старых/тестовых данных он мог стоять при неполном отборе.
     return status === 'ASSEMBLED' && isPickedCompleteForPacking(order);
   }
 
@@ -1559,7 +1549,6 @@
     } finally {
       input.value = '';
       Utils.setBusy(false);
-      // После setBusy(false) повторно пересчитываем кнопку завершения.
       if (APP_STATE.packing.currentOrder) renderPackItems();
       setTimeout(() => input.focus(), 0);
     }
@@ -1692,6 +1681,7 @@
     }
   }
 
+  // ── DISPATCH ─────────────────────────────────────────────────────────────
   async function loadDispatchList(options = {}) {
     if (APP_STATE.busy && !options.force) return;
     const list = $('#dispatch-list');
@@ -1879,6 +1869,7 @@
     }
   }
 
+  // ── INBOUND ──────────────────────────────────────────────────────────────
   async function processInbound() {
     if (APP_STATE.busy) return;
     const skuInput = $('#inb-sku');
@@ -1928,6 +1919,7 @@
     ).join('');
   }
 
+  // ── LOGS ─────────────────────────────────────────────────────────────────
   async function loadLogs(options = {}) {
     if (APP_STATE.busy && !options.force) return;
     const tbody = $('#logs-table-body');
@@ -1963,6 +1955,7 @@
     }).join('');
   }
 
+  // ── DASHBOARD (общий список + чипы-фильтры) ─────────────────────────────
   const STATUS_MAP = [
     { key: 'TOTAL', label: 'Все заказы', color: '#111827', isTotal: true },
     { key: 'NEW', label: 'Новые', color: '#f59e0b' },
@@ -1979,86 +1972,72 @@
 
   async function loadDashboardData(options = {}) {
     if (APP_STATE.busy && !options.force) return;
-    const grid = $('#stats-grid');
-    if (!options.silent) grid.innerHTML = '<div class="empty-state-card">Загрузка...</div>';
+    const tbody = $('#dashboard-table-body');
+    if (!options.silent) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
     try {
-      const rpcData = await Api.fetchStats();
-      APP_STATE.dashboard.counts = Object.fromEntries((rpcData || []).map(r => [r.status, Number(r.cnt)]));
-      renderDashboard();
+      const [statsData, ordersData] = await Promise.all([
+        Api.fetchStats(),
+        Api.fetchOrderDetails('TOTAL')
+      ]);
+      APP_STATE.dashboard.counts = Object.fromEntries((statsData || []).map(r => [r.status, Number(r.cnt)]));
+      APP_STATE.dashboard.rows = ordersData;
+      renderDashboardChips();
+      renderDashboardTable();
     } catch (error) {
       Utils.handleApiError(error, 'Ошибка дашборда');
-      grid.innerHTML = '<div class="empty-state-card" style="color:var(--danger);">Ошибка загрузки дашборда</div>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
     }
   }
 
-  function renderDashboard() {
-    const grid = $('#stats-grid');
+  function renderDashboardChips() {
+    const wrap = $('#dashboard-filter-chips');
     const counts = APP_STATE.dashboard.counts;
     const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
-    grid.innerHTML = '';
-    STATUS_MAP.forEach(info => {
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'stat-card';
-      card.style.borderTopColor = info.color;
+    wrap.innerHTML = STATUS_MAP.map(info => {
       const value = info.isTotal ? total : (counts[info.key] || 0);
-      card.innerHTML = `
-        <div class="stat-label">${Utils.escapeHTML(info.label)}</div>
-        <div class="stat-value" style="color:${info.isTotal ? '#111827' : info.color};">${value}</div>
-        <div class="stat-link">Посмотреть список →</div>`;
-      card.addEventListener('click', () => openDashboardDetails(info.key, info.label));
-      grid.appendChild(card);
+      const active = APP_STATE.dashboard.activeStatus === info.key;
+      const inlineStyle = active
+        ? `style="background:${info.color};border-color:${info.color};"`
+        : `style="border-color:${info.color}55;color:${info.color};"`;
+      return `<button type="button" class="filter-chip${active ? ' active' : ''}" data-status="${Utils.escapeHTML(info.key)}" ${inlineStyle}>
+        ${Utils.escapeHTML(info.label)} <span class="chip-count">${value}</span>
+      </button>`;
+    }).join('');
+    $$('.filter-chip', wrap).forEach(chip => {
+      chip.addEventListener('click', () => {
+        APP_STATE.dashboard.activeStatus = chip.dataset.status;
+        renderDashboardChips();
+        renderDashboardTable();
+      });
     });
   }
 
-  function closeDashboardDetails() {
-    $('#dashboard-details-view').style.display = 'none';
-    $('#dashboard-main-view').style.display = 'block';
-    APP_STATE.dashboard.activeStatusKey = null;
-    APP_STATE.dashboard.activeStatusLabel = null;
-    APP_STATE.dashboard.detailsRows = [];
-    APP_STATE.dashboard.detailSearch = '';
-    $('#dashboard-detail-search').value = '';
-  }
-
-  async function openDashboardDetails(statusKey, statusLabel, options = {}) {
-    if (APP_STATE.busy && !options.silent) return;
-    APP_STATE.dashboard.activeStatusKey = statusKey;
-    APP_STATE.dashboard.activeStatusLabel = statusLabel;
-    $('#dashboard-main-view').style.display = 'none';
-    $('#dashboard-details-view').style.display = 'block';
-    $('#details-view-title').textContent = statusLabel;
-    $('#details-table-head').innerHTML = `<tr>
-      <th>ID Заказа</th><th>Назначение</th><th>Контакт</th><th>Ящик</th><th>Дата</th>
-    </tr>`;
-    if (!options.silent) $('#details-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
-
-    try {
-      APP_STATE.dashboard.detailsRows = await Api.fetchOrderDetails(statusKey);
-      renderDashboardDetails();
-    } catch (error) {
-      Utils.handleApiError(error, 'Сбой детализации');
-      $('#details-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
+  function renderDashboardTable() {
+    const tbody = $('#dashboard-table-body');
+    let rows = APP_STATE.dashboard.rows;
+    if (APP_STATE.dashboard.activeStatus !== 'TOTAL') {
+      rows = rows.filter(r => r.status === APP_STATE.dashboard.activeStatus);
     }
-  }
-
-  function renderDashboardDetails() {
-    const tbody = $('#details-table-body');
-    const rows = Utils.filterRows(APP_STATE.dashboard.detailsRows, APP_STATE.dashboard.detailSearch, ['external_id', 'branch_name', 'pvz_code', 'route_number', 'phone', 'box_id', 'box_barcode', 'status']);
+    rows = Utils.filterRows(rows, APP_STATE.dashboard.search,
+      ['external_id', 'branch_name', 'pvz_code', 'route_number', 'phone', 'box_id', 'box_barcode', 'status']);
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map(o => `
-      <tr>
+    tbody.innerHTML = rows.map(o => {
+      const info = STATUS_MAP.find(s => s.key === o.status) || { label: o.status || '—', color: '#64748b' };
+      return `<tr>
         <td><b>${Utils.escapeHTML(o.external_id)}</b></td>
+        <td><span class="mini-pill" style="background:${info.color}22;color:${info.color};">${Utils.escapeHTML(info.label)}</span></td>
         <td>${Utils.escapeHTML(orderDestination(o))}</td>
         <td>${Utils.escapeHTML(o.phone || '—')}</td>
         <td>${(o.box_id || o.box_barcode) ? `<span class="mini-pill">📦 ${Utils.escapeHTML(o.box_id || o.box_barcode)}</span>` : '—'}</td>
         <td style="color:var(--muted);">${Utils.formatDateTime(o.created_at)}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
+  // ── HARDWARE SCANNER ─────────────────────────────────────────────────────
   class HardwareScanner {
     constructor(callback) {
       this.buffer = '';
@@ -2072,7 +2051,6 @@
       if (overlayVisible) return;
       if (event.ctrlKey || event.altKey || event.metaKey) return;
 
-      // Если фокус в поле ввода — пусть поле само обработает Enter, чтобы не было двойного сканирования.
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isInputFocused = ['input', 'textarea', 'select'].includes(tag);
       if (isInputFocused) return;
@@ -2110,6 +2088,7 @@
     }
   });
 
+  // ── NAVIGATION ───────────────────────────────────────────────────────────
   function switchView(target) {
     $$('.view').forEach(v => v.classList.remove('active'));
     $$('.nav-tab').forEach(tab => {
@@ -2124,9 +2103,10 @@
     if (target === 'dispatch') loadDispatchList({ silent: true });
     if (target === 'inbound') setTimeout(() => $('#inb-sku').focus(), 0);
     if (target === 'logs') loadLogs();
-    if (target === 'dashboard') { closeDashboardDetails(); loadDashboardData(); }
+    if (target === 'dashboard') loadDashboardData();
   }
 
+  // ── AUTH ─────────────────────────────────────────────────────────────────
   async function doLogin() {
     const email = Utils.normalize($('#login-email').value);
     const password = $('#login-password').value;
@@ -2204,6 +2184,7 @@
     setTimeout(() => $('#login-email').focus(), 150);
   }
 
+  // ── EVENT BINDINGS ───────────────────────────────────────────────────────
   function bindEvents() {
     $$('.nav-tab').forEach(tab => tab.addEventListener('click', () => switchView(tab.dataset.target)));
 
@@ -2283,23 +2264,18 @@
     });
 
     $('#btn-dashboard-refresh').addEventListener('click', () => loadDashboardData({ force: true }));
-    $('#btn-dash-back').addEventListener('click', closeDashboardDetails);
-    $('#dashboard-detail-search').addEventListener('input', (event) => {
-      APP_STATE.dashboard.detailSearch = event.target.value;
-      renderDashboardDetails();
+    $('#dashboard-search').addEventListener('input', (event) => {
+      APP_STATE.dashboard.search = event.target.value;
+      renderDashboardTable();
     });
   }
 
+  // ── AUTO REFRESH ─────────────────────────────────────────────────────────
   setInterval(() => {
     if (!navigator.onLine || APP_STATE.busy || $('#login-overlay').style.display !== 'none') return;
     if (APP_STATE.currentView === 'packing' && !APP_STATE.packing.currentOrder) loadPackList({ silent: true });
     if (APP_STATE.currentView === 'dispatch' && !APP_STATE.dispatch.boxId) loadDispatchList({ silent: true });
-    if (APP_STATE.currentView === 'dashboard') {
-      loadDashboardData({ silent: true });
-      if ($('#dashboard-details-view').style.display === 'block' && APP_STATE.dashboard.activeStatusKey) {
-        openDashboardDetails(APP_STATE.dashboard.activeStatusKey, APP_STATE.dashboard.activeStatusLabel, { silent: true });
-      }
-    }
+    if (APP_STATE.currentView === 'dashboard') loadDashboardData({ silent: true });
   }, CONFIG.REFRESH_RATE_MS);
 
   bindEvents();
