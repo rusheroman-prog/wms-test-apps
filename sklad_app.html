@@ -991,7 +991,11 @@
                 <th>Статус</th>
                 <th>ПВЗ</th>
                 <th>Ящик</th>
-                <th>Дата</th>
+                <th>Создан</th>
+                <th>Отгрузка</th>
+                <th>Приём</th>
+                <th>Выдача</th>
+                <th>Возврат</th>
               </tr>
             </thead>
             <tbody id="dashboard-table-body"></tbody>
@@ -1327,7 +1331,7 @@
 
       // Fallback для старой схемы без RPC.
       let query = db.from('customer_orders')
-        .select('external_id, pvz_code, route_number, phone, status, box_barcode, created_at')
+        .select('external_id, pvz_code, route_number, phone, status, box_barcode, box_id, created_at, shipped_at, arrived_at_pvz_at, pvz_received_at, completed_at, pvz_completed_at, returned_at, pvz_returned_at')
         .order('created_at', { ascending: false })
         .limit(CONFIG.DETAILS_LIMIT);
       if (statusKey !== 'TOTAL') query = query.eq('status', statusKey);
@@ -2047,7 +2051,7 @@
   async function loadDashboardData(options = {}) {
     if (APP_STATE.busy && !options.force) return;
     const tbody = $('#dashboard-table-body');
-    if (!options.silent) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
+    if (!options.silent) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
     try {
       const [statsData, ordersData] = await Promise.all([
         Api.fetchStats(),
@@ -2059,7 +2063,7 @@
       renderDashboardTable();
     } catch (error) {
       Utils.handleApiError(error, 'Ошибка дашборда');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
     }
   }
 
@@ -2095,7 +2099,7 @@
     rows = Utils.filterRows(rows, APP_STATE.dashboard.search,
       ['external_id', 'pvz_code', 'route_number', 'box_id', 'box_barcode', 'status']);
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(o => {
@@ -2105,7 +2109,11 @@
         <td><span class="mini-pill" style="background:${info.color}22;color:${info.color};">${Utils.escapeHTML(info.label)}</span></td>
         <td>${o.pvz_code ? `<b>${Utils.escapeHTML(o.pvz_code)}</b>` : '—'}</td>
         <td>${(o.box_id || o.box_barcode) ? `<span class="mini-pill">📦 ${Utils.escapeHTML(o.box_id || o.box_barcode)}</span>` : '—'}</td>
-        <td style="color:var(--muted);">${Utils.formatDateTime(o.created_at)}</td>
+        <td style="color:var(--muted);white-space:nowrap;">${Utils.formatDateTime(o.created_at)}</td>
+        <td style="color:var(--muted);white-space:nowrap;">${Utils.formatDateTime(o.shipped_at)}</td>
+        <td style="color:var(--muted);white-space:nowrap;">${Utils.formatDateTime(o.arrived_at_pvz_at || o.pvz_received_at)}</td>
+        <td style="color:var(--muted);white-space:nowrap;">${Utils.formatDateTime(o.completed_at || o.pvz_completed_at)}</td>
+        <td style="color:var(--muted);white-space:nowrap;">${Utils.formatDateTime(o.returned_at || o.pvz_returned_at)}</td>
       </tr>`;
     }).join('');
   }
