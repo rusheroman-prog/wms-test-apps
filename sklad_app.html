@@ -973,10 +973,10 @@
         <div class="toolbar">
           <div>
             <h1 class="panel-title">Заказы и статусы</h1>
-            <p class="panel-subtitle">Общий список заказов через RPC get_sklad_order_details_v1. Кликните чип, чтобы отфильтровать по статусу. Поиск работает по ID, ПВЗ, телефону и ящику.</p>
+            <p class="panel-subtitle">Общий список заказов через RPC get_sklad_order_details_v1. Кликните чип, чтобы отфильтровать по статусу. Поиск работает по ID, ПВЗ и ящику.</p>
           </div>
           <div class="table-actions">
-            <input type="search" id="dashboard-search" class="search-input" style="width:280px;" placeholder="Фильтр по ID / ПВЗ / телефону / ящику" />
+            <input type="search" id="dashboard-search" class="search-input" style="width:280px;" placeholder="Фильтр по ID / ПВЗ / ящику" />
             <button class="btn btn-outline" id="btn-dashboard-refresh">↻ Обновить</button>
           </div>
         </div>
@@ -989,8 +989,7 @@
               <tr>
                 <th>ID Заказа</th>
                 <th>Статус</th>
-                <th>Назначение</th>
-                <th>Контакт</th>
+                <th>ПВЗ</th>
                 <th>Ящик</th>
                 <th>Дата</th>
               </tr>
@@ -2048,7 +2047,7 @@
   async function loadDashboardData(options = {}) {
     if (APP_STATE.busy && !options.force) return;
     const tbody = $('#dashboard-table-body');
-    if (!options.silent) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
+    if (!options.silent) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Загрузка...</td></tr>';
     try {
       const [statsData, ordersData] = await Promise.all([
         Api.fetchStats(),
@@ -2060,7 +2059,7 @@
       renderDashboardTable();
     } catch (error) {
       Utils.handleApiError(error, 'Ошибка дашборда');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--danger);">Ошибка загрузки</td></tr>';
     }
   }
 
@@ -2094,9 +2093,9 @@
       rows = rows.filter(r => r.status === APP_STATE.dashboard.activeStatus);
     }
     rows = Utils.filterRows(rows, APP_STATE.dashboard.search,
-      ['external_id', 'branch_name', 'pvz_code', 'route_number', 'phone', 'box_id', 'box_barcode', 'status']);
+      ['external_id', 'pvz_code', 'route_number', 'box_id', 'box_barcode', 'status']);
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Пусто</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(o => {
@@ -2104,8 +2103,7 @@
       return `<tr>
         <td><b>${Utils.escapeHTML(o.external_id)}</b></td>
         <td><span class="mini-pill" style="background:${info.color}22;color:${info.color};">${Utils.escapeHTML(info.label)}</span></td>
-        <td>${Utils.escapeHTML(orderDestination(o))}</td>
-        <td>${Utils.escapeHTML(o.phone || '—')}</td>
+        <td>${o.pvz_code ? `<b>${Utils.escapeHTML(o.pvz_code)}</b>` : '—'}</td>
         <td>${(o.box_id || o.box_barcode) ? `<span class="mini-pill">📦 ${Utils.escapeHTML(o.box_id || o.box_barcode)}</span>` : '—'}</td>
         <td style="color:var(--muted);">${Utils.formatDateTime(o.created_at)}</td>
       </tr>`;
