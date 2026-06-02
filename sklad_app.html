@@ -579,7 +579,6 @@
     }
     #label-to-print .label-order { font-size: 20px; font-weight: bold; margin: 4px 0; }
     #label-to-print .label-phone { font-size: 13px; color: #555; }
-    #label-to-print .label-box { font-size: 12px; color: #777; margin-top: 4px; }
     #label-to-print .label-print-meta { font-size: 10px; color: #777; margin-top: 5px; }
     #label-qr { display: flex; justify-content: center; margin: 6px 0; }
 
@@ -598,10 +597,33 @@
     .print-history-row b { color: var(--text); }
     .print-history-row span { color: var(--muted); }
 
+    /* Печать только этикетки на рулон 58 мм. Без @page браузер берёт A4,
+       из-за чего на термопринтере прокручиваются лишние пустые наклейки. */
+    @page {
+      size: 58mm 100mm;
+      margin: 0;
+    }
     @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 58mm;
+        background: #fff;
+      }
       body * { visibility: hidden; }
       #label-to-print, #label-to-print * { visibility: visible; }
-      #label-to-print { position: absolute; left: 0; top: 0; display: block !important; width: 260px; }
+      #label-to-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        display: block !important;
+        width: 58mm;
+        margin: 0;
+        padding: 2mm 1.5mm;
+        box-sizing: border-box;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
     }
 
     #login-overlay {
@@ -963,7 +985,6 @@
   <div id="label-qr"></div>
   <div class="label-order" id="lbl-id">0000</div>
   <div class="label-phone" id="lbl-phone"></div>
-  <div class="label-box" id="lbl-box" style="display:none;"></div>
   <div class="label-print-meta" id="lbl-date"></div>
 </div>
 
@@ -1270,7 +1291,8 @@
 
     async fetchOrderDetails(statusKey) {
       // Детализация должна идти через SECURITY DEFINER RPC.
-      // Иначе при включённом RLS дашборд показывает счётчики, но прямой select из customer_orders возвращает 0 строк без ошибки.
+      // Иначе при включённом RLS дашборд показывает счётчики,
+      // но прямой select из customer_orders возвращает 0 строк без ошибки.
       const detailsRpc = await Api.rpcOptional('get_sklad_order_details_v1', {
         p_status: statusKey,
         p_limit: CONFIG.DETAILS_LIMIT
@@ -1386,6 +1408,8 @@
 
   function isOrderOnPackingTable(order) {
     const status = String(order?.status || '').toUpperCase();
+    // На стол упаковки попадают только заказы, где отбор фактически завершён.
+    // Один статус ASSEMBLED недостаточен: в старых/тестовых данных он мог стоять при неполном отборе.
     return status === 'ASSEMBLED' && isPickedCompleteForPacking(order);
   }
 
@@ -1587,17 +1611,14 @@
 
   function printOrderLabel(order, label = null) {
     const qrPayload = label?.qr_payload || order?.label?.qr_payload || order.external_id;
-    const route = label?.route_number ?? order?.route_number ?? '—';
+    const route = label?.route_number ?? order?.route_number ?? order?.route ?? '—';
     const pvz = label?.pvz_code || order?.pvz_code || orderDestination(order) || 'ПВЗ';
     const phone = order?.phone ? `Тел: ${order.phone}` : '';
-    const box = label?.package_barcode || order?.package_barcode || order?.box_barcode || order?.box_id || '';
 
     $('#lbl-route').textContent = route || '—';
     $('#lbl-pvz').textContent = pvz;
     $('#lbl-id').textContent = String(order.external_id || qrPayload);
     $('#lbl-phone').textContent = phone;
-    $('#lbl-box').style.display = box ? 'block' : 'none';
-    $('#lbl-box').textContent = box ? `Пакет: ${box}` : '';
     $('#lbl-date').textContent = new Date().toLocaleString();
 
     const qrBox = $('#label-qr');
@@ -1669,9 +1690,9 @@
     Utils.setBusy(true, 'Повторная печать этикетки...');
     try {
       const result = await Api.reprintShippingLabel(externalId);
-      const baseOrder = APP_STATE.packing.currentOrder?.external_id === externalId
-  ? APP_STATE.packing.currentOrder : {};
-const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
+      const baseOrder = String(APP_STATE.packing.currentOrder?.external_id ?? '') === externalId
+        ? APP_STATE.packing.currentOrder : {};
+      const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
       printOrderLabel(order, result.label || order.label);
       await loadPrintHistory(externalId, { silent: true });
       Utils.showToast(`🖨 Этикетка заказа #${externalId} отправлена на повторную печать`, 'success');
