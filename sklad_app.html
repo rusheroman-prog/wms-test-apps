@@ -1270,7 +1270,8 @@
 
     async fetchOrderDetails(statusKey) {
       // Детализация должна идти через SECURITY DEFINER RPC.
-      // Иначе при включённом RLS дашборд показывает счётчики, но прямой select из customer_orders возвращает 0 строк без ошибки.
+      // Иначе при включённом RLS дашборд показывает счётчики,
+      // но прямой select из customer_orders возвращает 0 строк без ошибки.
       const detailsRpc = await Api.rpcOptional('get_sklad_order_details_v1', {
         p_status: statusKey,
         p_limit: CONFIG.DETAILS_LIMIT
@@ -1386,6 +1387,8 @@
 
   function isOrderOnPackingTable(order) {
     const status = String(order?.status || '').toUpperCase();
+    // На стол упаковки попадают только заказы, где отбор фактически завершён.
+    // Один статус ASSEMBLED недостаточен: в старых/тестовых данных он мог стоять при неполном отборе.
     return status === 'ASSEMBLED' && isPickedCompleteForPacking(order);
   }
 
@@ -1669,9 +1672,9 @@
     Utils.setBusy(true, 'Повторная печать этикетки...');
     try {
       const result = await Api.reprintShippingLabel(externalId);
-      const baseOrder = APP_STATE.packing.currentOrder?.external_id === externalId
-  ? APP_STATE.packing.currentOrder : {};
-const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
+      const baseOrder = String(APP_STATE.packing.currentOrder?.external_id ?? '') === externalId
+        ? APP_STATE.packing.currentOrder : {};
+      const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
       printOrderLabel(order, result.label || order.label);
       await loadPrintHistory(externalId, { silent: true });
       Utils.showToast(`🖨 Этикетка заказа #${externalId} отправлена на повторную печать`, 'success');
