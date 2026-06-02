@@ -1638,8 +1638,8 @@
   }
 
   // route_number обычно не возвращается RPC упаковки (claim/finish/reprint),
-  // поэтому при печати подставляем маршрут по коду ПВЗ из справочника pvz_routes
-  // (см. sql/pvz_routes.sql). Точечный запрос по первичному ключу — дёшево.
+  // поэтому при печати подставляем маршрут по коду ПВЗ из справочника
+  // pvz_locations (см. sql/pvz_route_link.sql). Лёгкий запрос по коду.
   async function resolveRouteNumber(order, label) {
     const direct = label?.route_number ?? order?.route_number ?? order?.route;
     if (hasRoute(direct)) return direct;
@@ -1648,11 +1648,12 @@
     if (!code) return null;
 
     try {
-      const { data, error } = await db.from('pvz_routes')
+      const { data, error } = await db.from('pvz_locations')
         .select('route_number')
         .eq('code', code)
-        .maybeSingle();
-      if (!error && data && hasRoute(data.route_number)) return data.route_number;
+        .not('route_number', 'is', null)
+        .limit(1);
+      if (!error && data && data.length && hasRoute(data[0].route_number)) return data[0].route_number;
     } catch (lookupError) {
       console.warn('Route number lookup failed', lookupError);
     }
