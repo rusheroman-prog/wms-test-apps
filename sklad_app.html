@@ -608,15 +608,16 @@
         margin: 0 !important;
         padding: 0 !important;
         width: 58mm;
+        height: auto;
         background: #fff;
       }
-      body * { visibility: hidden; }
-      #label-to-print, #label-to-print * { visibility: visible; }
+      /* Прячем всё, кроме этикетки, именно через display:none.
+         visibility:hidden оставляет контент в потоке, и тело приложения
+         занимает несколько страниц по высоте → печатаются пустые наклейки. */
+      body > *:not(#label-to-print) { display: none !important; }
       #label-to-print {
-        position: absolute;
-        left: 0;
-        top: 0;
         display: block !important;
+        position: static;
         width: 58mm;
         margin: 0;
         padding: 2mm 1.5mm;
@@ -1594,7 +1595,7 @@
       const result = await Api.finishPackaging(order.id);
       const updatedOrder = { ...order, ...(result.order || {}) };
       try { await Api.recordLabelPrint(updatedOrder.external_id, 'INITIAL'); } catch (historyError) { console.warn('Initial print history log failed', historyError); }
-      printOrderLabel(updatedOrder, result.label || updatedOrder.label);
+      await printOrderLabel(updatedOrder, result.label || updatedOrder.label);
       await loadPrintHistory(updatedOrder.external_id, { silent: true });
       Utils.showToast(`✅ Заказ #${updatedOrder.external_id} упакован, этикетка напечатана`, 'success');
       cancelPackSelection();
@@ -1609,9 +1610,38 @@
     }
   }
 
-  function printOrderLabel(order, label = null) {
+  function hasRoute(value) {
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  // route_number обычно не возвращается RPC упаковки (claim/finish/reprint),
+  // поэтому при печати достаём его по external_id из RPC детализации
+  // get_sklad_order_details_v1 — там это поле есть (дашборд по нему фильтрует).
+  async function resolveRouteNumber(order, label) {
+    const direct = label?.route_number ?? order?.route_number ?? order?.route;
+    if (hasRoute(direct)) return direct;
+
+    const externalId = String(order?.external_id ?? '').trim();
+    if (!externalId) return null;
+
+    const fromCache = (APP_STATE.dashboard.rows || [])
+      .find(r => String(r.external_id) === externalId);
+    if (fromCache && hasRoute(fromCache.route_number)) return fromCache.route_number;
+
+    try {
+      const rows = await Api.fetchOrderDetails('TOTAL');
+      const match = (rows || []).find(r => String(r.external_id) === externalId);
+      if (match && hasRoute(match.route_number)) return match.route_number;
+    } catch (lookupError) {
+      console.warn('Route number lookup failed', lookupError);
+    }
+    return null;
+  }
+
+  async function printOrderLabel(order, label = null) {
     const qrPayload = label?.qr_payload || order?.label?.qr_payload || order.external_id;
-    const route = label?.route_number ?? order?.route_number ?? order?.route ?? '—';
+    const routeNumber = await resolveRouteNumber(order, label);
+    const route = hasRoute(routeNumber) ? routeNumber : '—';
     const pvz = label?.pvz_code || order?.pvz_code || orderDestination(order) || 'ПВЗ';
     const phone = order?.phone ? `Тел: ${order.phone}` : '';
 
@@ -1693,7 +1723,7 @@
       const baseOrder = String(APP_STATE.packing.currentOrder?.external_id ?? '') === externalId
         ? APP_STATE.packing.currentOrder : {};
       const order = { ...baseOrder, ...(result.order || { external_id: externalId }) };
-      printOrderLabel(order, result.label || order.label);
+      await printOrderLabel(order, result.label || order.label);
       await loadPrintHistory(externalId, { silent: true });
       Utils.showToast(`🖨 Этикетка заказа #${externalId} отправлена на повторную печать`, 'success');
     } catch (error) {
