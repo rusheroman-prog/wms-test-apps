@@ -597,10 +597,10 @@
     .print-history-row b { color: var(--text); }
     .print-history-row span { color: var(--muted); }
 
-    /* Печать только этикетки на рулон 58 мм. Без @page браузер берёт A4,
+    /* Печать только этикетки на наклейку 58×60 мм. Без @page браузер берёт A4,
        из-за чего на термопринтере прокручиваются лишние пустые наклейки. */
     @page {
-      size: 58mm 100mm;
+      size: 58mm 60mm;
       margin: 0;
     }
     @media print {
@@ -620,11 +620,34 @@
         position: static;
         width: 58mm;
         margin: 0;
-        padding: 2mm 1.5mm;
+        padding: 1.5mm;
         box-sizing: border-box;
         page-break-inside: avoid;
         break-inside: avoid;
       }
+      /* Ужимаем содержимое под высоту 60 мм, чтобы всё легло на одну наклейку. */
+      #label-to-print .label-route {
+        font-size: 26px;
+        border-width: 2px;
+        padding: 1px 0;
+        margin: 1px 0;
+        letter-spacing: 1px;
+      }
+      #label-to-print .label-pvz {
+        font-size: 11px;
+        padding-bottom: 2px;
+        margin-bottom: 3px;
+      }
+      #label-qr { margin: 3px 0; }
+      #label-qr img,
+      #label-qr canvas,
+      #label-qr table {
+        width: 26mm !important;
+        height: 26mm !important;
+      }
+      #label-to-print .label-order { font-size: 14px; margin: 2px 0; }
+      #label-to-print .label-phone { font-size: 9px; }
+      #label-to-print .label-print-meta { font-size: 8px; margin-top: 2px; }
     }
 
     #login-overlay {
