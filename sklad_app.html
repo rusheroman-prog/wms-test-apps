@@ -1638,23 +1638,21 @@
   }
 
   // route_number обычно не возвращается RPC упаковки (claim/finish/reprint),
-  // поэтому при печати достаём его по external_id из RPC детализации
-  // get_sklad_order_details_v1 — там это поле есть (дашборд по нему фильтрует).
+  // поэтому при печати подставляем маршрут по коду ПВЗ из справочника pvz_routes
+  // (см. sql/pvz_routes.sql). Точечный запрос по первичному ключу — дёшево.
   async function resolveRouteNumber(order, label) {
     const direct = label?.route_number ?? order?.route_number ?? order?.route;
     if (hasRoute(direct)) return direct;
 
-    const externalId = String(order?.external_id ?? '').trim();
-    if (!externalId) return null;
-
-    const fromCache = (APP_STATE.dashboard.rows || [])
-      .find(r => String(r.external_id) === externalId);
-    if (fromCache && hasRoute(fromCache.route_number)) return fromCache.route_number;
+    const code = String(label?.pvz_code ?? order?.pvz_code ?? '').trim().toUpperCase();
+    if (!code) return null;
 
     try {
-      const rows = await Api.fetchOrderDetails('TOTAL');
-      const match = (rows || []).find(r => String(r.external_id) === externalId);
-      if (match && hasRoute(match.route_number)) return match.route_number;
+      const { data, error } = await db.from('pvz_routes')
+        .select('route_number')
+        .eq('code', code)
+        .maybeSingle();
+      if (!error && data && hasRoute(data.route_number)) return data.route_number;
     } catch (lookupError) {
       console.warn('Route number lookup failed', lookupError);
     }
