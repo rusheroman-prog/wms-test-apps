@@ -752,6 +752,7 @@
       <button class="nav-tab" role="tab" aria-selected="false" data-target="inbound">📥 Приемка</button>
       <button class="nav-tab" role="tab" aria-selected="false" data-target="logs">📜 Журнал</button>
       <button class="nav-tab" role="tab" aria-selected="false" data-target="dashboard">📊 Мониторинг</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="reports">📑 Отчёты</button>
     </div>
 
     <div id="user-info" class="user-info">
@@ -1003,6 +1004,33 @@
         </div>
       </div>
     </section>
+
+    <section id="view-reports" class="view" role="tabpanel" aria-label="Отчёты">
+      <div class="main-panel" style="width:100%;">
+        <div class="toolbar">
+          <div>
+            <h1 class="panel-title">Отчётность (WMS Reporting)</h1>
+            <p class="panel-subtitle">Выберите период и выгрузите движение в CSV (открывается в Excel / Google Sheets).</p>
+          </div>
+        </div>
+
+        <div class="page-card">
+          <div class="table-actions" style="align-items:flex-end;gap:16px;flex-wrap:wrap;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:800;">
+              Период с
+              <input type="date" id="report-date-from" class="search-input" style="width:170px;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:800;">
+              по
+              <input type="date" id="report-date-to" class="search-input" style="width:170px;" />
+            </label>
+            <button class="btn btn-primary" id="btn-report-movements">⬇ Движение остатков (CSV)</button>
+            <button class="btn btn-primary" id="btn-report-orders">⬇ Заказы + этапы (CSV)</button>
+          </div>
+          <p id="report-status" class="panel-subtitle" style="margin-top:14px;">Период по умолчанию — последние 30 дней. Фильтр по дате создания записи.</p>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -1026,6 +1054,7 @@
     REFRESH_RATE_MS: 20000,
     LOG_LIMIT: 100,
     DETAILS_LIMIT: 2000,
+    REPORT_LIMIT: 50000,
     USE_STRONG_RPC_WHEN_AVAILABLE: true
   };
 
@@ -1078,6 +1107,39 @@
       const dt = new Date(value);
       if (Number.isNaN(dt.getTime())) return '—';
       return dt.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    },
+
+    // Дата для CSV: локальное "YYYY-MM-DD HH:MM:SS", пустое — пустая строка.
+    csvDateTime: (value) => {
+      if (!value) return '';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return '';
+      const p = (n) => String(n).padStart(2, '0');
+      return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+    },
+
+    // Сборка CSV (разделитель ';' — дружелюбно к Excel в RU-локали).
+    toCSV: (headers, rows) => {
+      const SEP = ';';
+      const cell = (v) => {
+        const s = v === null || v === undefined ? '' : String(v);
+        return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const lines = [headers.map(cell).join(SEP)];
+      for (const row of rows) lines.push(row.map(cell).join(SEP));
+      return lines.join('\r\n');
+    },
+
+    downloadCSV: (filename, csv) => {
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
     showToast: (msg, type = 'success') => {
@@ -1300,6 +1362,42 @@
       }
       if (response.error) throw response.error;
       return response.data || [];
+    },
+
+    // Движение остатков за период (stock_movements, fallback stock_log).
+    // fromISO включительно, toISO исключительно (обычно начало следующего дня).
+    async fetchStockMovementsReport(fromISO, toISO) {
+      let response = await db.from('stock_movements')
+        .select('*')
+        .gte('created_at', fromISO)
+        .lt('created_at', toISO)
+        .order('created_at', { ascending: true })
+        .limit(CONFIG.REPORT_LIMIT);
+      if (response.error) {
+        response = await db.from('stock_log')
+          .select('*')
+          .gte('created_at', fromISO)
+          .lt('created_at', toISO)
+          .order('created_at', { ascending: true })
+          .limit(CONFIG.REPORT_LIMIT);
+      }
+      if (response.error) throw response.error;
+      return response.data || [];
+    },
+
+    // Заказы со всеми этапами для отчёта (через тот же RPC, что и мониторинг,
+    // но с увеличенным лимитом). Фильтрация по дате — на стороне клиента.
+    async fetchOrdersReport() {
+      const detailsRpc = await Api.rpcOptional('get_sklad_order_details_v1', {
+        p_status: 'TOTAL',
+        p_limit: CONFIG.REPORT_LIMIT
+      });
+      if (!detailsRpc.skipped) {
+        if (detailsRpc.data?.ok === false) throw new Error(detailsRpc.data.error || 'Ошибка отчёта по заказам');
+        return (detailsRpc.data?.orders || []).map(Api.normalizeOrder);
+      }
+      // Fallback на прямой select (то же поведение, что в fetchOrderDetails).
+      return Api.fetchOrderDetails('TOTAL');
     },
 
     async fetchStats() {
@@ -2118,6 +2216,113 @@
     }).join('');
   }
 
+  // ── REPORTS (выгрузка движения в CSV) ───────────────────────────────────
+  function initReportDates() {
+    const to = $('#report-date-to');
+    const from = $('#report-date-from');
+    if (to.value && from.value) return;
+    const now = new Date();
+    const ago = new Date();
+    ago.setDate(now.getDate() - 30);
+    const iso = (d) => d.toISOString().slice(0, 10);
+    from.value = iso(ago);
+    to.value = iso(now);
+  }
+
+  // Возвращает {fromISO, toISO} — границы периода [00:00 с; 00:00 дня после "по").
+  function reportRange() {
+    const fromVal = $('#report-date-from').value;
+    const toVal = $('#report-date-to').value;
+    if (!fromVal || !toVal) {
+      Utils.showToast('Укажите период (с / по)', 'warning');
+      return null;
+    }
+    if (fromVal > toVal) {
+      Utils.showToast('Дата «с» позже даты «по»', 'warning');
+      return null;
+    }
+    const toEnd = new Date(`${toVal}T00:00:00`);
+    toEnd.setDate(toEnd.getDate() + 1);
+    return { fromISO: new Date(`${fromVal}T00:00:00`).toISOString(), toISO: toEnd.toISOString(), label: `${fromVal}_${toVal}` };
+  }
+
+  function setReportStatus(text) {
+    $('#report-status').textContent = text;
+  }
+
+  async function exportStockMovements() {
+    const range = reportRange();
+    if (!range || APP_STATE.busy) return;
+    Utils.setBusy(true, 'Формирование отчёта по движению...');
+    try {
+      const rows = await Api.fetchStockMovementsReport(range.fromISO, range.toISO);
+      const headers = ['Дата', 'Тип операции', 'SKU', 'Ячейка', 'Изменение', 'Остаток после', 'Заказ/документ', 'Оператор', 'Примечание'];
+      const data = rows.map(r => [
+        Utils.csvDateTime(r.created_at),
+        r.movement_type || r.operation_type || r.type || '',
+        r.sku || '',
+        r.cell_code || r.cell || '',
+        r.qty_change ?? r.qty_delta ?? '',
+        r.resulting_qty ?? r.qty_after ?? '',
+        r.reference_external_id || r.reference_id || '',
+        r.operator_id || '',
+        r.note || ''
+      ]);
+      if (!data.length) {
+        setReportStatus('За выбранный период движений не найдено.');
+        Utils.showToast('Нет данных за период', 'warning');
+        return;
+      }
+      Utils.downloadCSV(`wms_dvizhenie_ostatkov_${range.label}.csv`, Utils.toCSV(headers, data));
+      setReportStatus(`Выгружено строк движения: ${data.length}.`);
+      Utils.showToast(`📑 Отчёт по движению: ${data.length} строк`, 'success');
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка отчёта по движению');
+    } finally {
+      Utils.setBusy(false);
+    }
+  }
+
+  async function exportOrdersReport() {
+    const range = reportRange();
+    if (!range || APP_STATE.busy) return;
+    Utils.setBusy(true, 'Формирование отчёта по заказам...');
+    try {
+      const all = await Api.fetchOrdersReport();
+      const fromMs = new Date(range.fromISO).getTime();
+      const toMs = new Date(range.toISO).getTime();
+      const rows = all.filter(o => {
+        const t = new Date(o.created_at).getTime();
+        return Number.isFinite(t) && t >= fromMs && t < toMs;
+      });
+      const headers = ['ID заказа', 'Статус', 'ПВЗ', 'Маршрут', 'Ящик', 'Создан', 'Отгрузка', 'Приём', 'Выдача', 'Возврат'];
+      const data = rows.map(o => [
+        o.external_id || '',
+        o.status || '',
+        o.pvz_code || '',
+        (o.route_number ?? o.route ?? ''),
+        o.box_id || o.box_barcode || '',
+        Utils.csvDateTime(o.created_at),
+        Utils.csvDateTime(o.shipped_at),
+        Utils.csvDateTime(o.arrived_at_pvz_at || o.pvz_received_at),
+        Utils.csvDateTime(o.completed_at || o.pvz_completed_at),
+        Utils.csvDateTime(o.returned_at || o.pvz_returned_at)
+      ]);
+      if (!data.length) {
+        setReportStatus('За выбранный период заказов не найдено.');
+        Utils.showToast('Нет данных за период', 'warning');
+        return;
+      }
+      Utils.downloadCSV(`wms_zakazy_etapy_${range.label}.csv`, Utils.toCSV(headers, data));
+      setReportStatus(`Выгружено заказов: ${data.length}.`);
+      Utils.showToast(`📑 Отчёт по заказам: ${data.length} строк`, 'success');
+    } catch (error) {
+      Utils.handleApiError(error, 'Ошибка отчёта по заказам');
+    } finally {
+      Utils.setBusy(false);
+    }
+  }
+
   // ── HARDWARE SCANNER ─────────────────────────────────────────────────────
   class HardwareScanner {
     constructor(callback) {
@@ -2185,6 +2390,7 @@
     if (target === 'inbound') setTimeout(() => $('#inb-sku').focus(), 0);
     if (target === 'logs') loadLogs();
     if (target === 'dashboard') loadDashboardData();
+    if (target === 'reports') initReportDates();
   }
 
   // ── AUTH ─────────────────────────────────────────────────────────────────
@@ -2349,6 +2555,9 @@
       APP_STATE.dashboard.search = event.target.value;
       renderDashboardTable();
     });
+
+    $('#btn-report-movements').addEventListener('click', exportStockMovements);
+    $('#btn-report-orders').addEventListener('click', exportOrdersReport);
   }
 
   // ── AUTO REFRESH ─────────────────────────────────────────────────────────
