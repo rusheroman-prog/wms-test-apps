@@ -612,7 +612,7 @@
 
     <div class="clock-chip" id="topbar-clock" title="Текущее время">
       <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-      <span id="clock-time">--:--:--</span>
+      <span id="clock-time">—</span>
     </div>
 
     <button class="theme-toggle" id="theme-toggle" data-no-busy-lock="true" title="Сменить тему" aria-label="Сменить тему"></button>
@@ -2447,9 +2447,9 @@
     if (!el) return;
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
-    el.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    el.textContent = `${p(d.getDate())}.${p(d.getMonth() + 1)} · ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
-  function startClock() { updateClock(); setInterval(updateClock, 1000); }
+  function startClock() { updateClock(); setInterval(updateClock, 15000); }
   function toggleTheme() {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     localStorage.setItem(THEME_KEY, next);
