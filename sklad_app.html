@@ -76,20 +76,12 @@
       color-scheme: dark;
     }
 
-    /* Legacy-алиасы: имена, на которые опираются inline-стили и старый JS. */
+    /* Legacy-алиасы: имена, на которые опираются inline-стили в разметке. */
     :root {
       --primary: var(--accent);
-      --primary-dark: var(--accent-strong);
-      --primary-soft: var(--accent-soft);
       --muted: var(--text-2);
-      --muted-2: var(--text-3);
       --success: var(--ok);
       --success-soft: var(--ok-soft);
-      --warning: var(--warn);
-      --radius: var(--r-lg);
-      --radius-sm: var(--r-sm);
-      --shadow: var(--shadow-pop);
-      --shadow-soft: var(--shadow-card);
     }
 
     * { box-sizing: border-box; }
@@ -260,7 +252,6 @@
     .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
     .btn-success { background: var(--ok); color: #fff; }
     .btn-success:hover:not(:disabled) { filter: brightness(0.96); }
-    .btn-danger { background: var(--danger); color: #fff; }
     .btn-outline { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
     .btn-outline:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text-3); }
     .btn-small { height: 38px; padding: 0 12px; font-size: 13px; border-radius: var(--r-sm); }
@@ -1178,7 +1169,7 @@
       return {
         ...raw,
         branch_name: dest,
-        box_id: raw.box_id || raw.box_barcode || raw.box_barcode,
+        box_id: raw.box_id || raw.box_barcode,
         qty_plan: Utils.safeNumber(raw.qty_plan ?? raw.total_qty, 0),
         qty_packaged: Utils.safeNumber(raw.qty_packaged, 0),
         qty_picked: Utils.safeNumber(raw.qty_picked ?? raw.picked_qty, 0),
@@ -1411,6 +1402,8 @@
     }
   };
 
+  const ORDER_SEARCH_FIELDS = ['external_id', 'branch_name', 'pvz_code', 'route_number'];
+
   function orderDestination(order) {
     if (!order) return '—';
     if (order.branch_name) return order.branch_name;
@@ -1485,7 +1478,7 @@
     const table = $('#packing-table-list');
     if (!table) return;
     const rows = Utils
-      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ['external_id', 'branch_name', 'pvz_code', 'route_number'])
+      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ORDER_SEARCH_FIELDS)
       .filter(isOrderOnPackingTable);
 
     $('#pack-table-count').textContent = String(rows.length);
@@ -1525,7 +1518,7 @@
   function renderPackList() {
     const list = $('#order-list');
     const rows = Utils
-      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ['external_id', 'branch_name', 'pvz_code', 'route_number'])
+      .filterRows(APP_STATE.packing.list, APP_STATE.packing.search, ORDER_SEARCH_FIELDS)
       .filter(isOrderInPackingWork);
 
     $('#pack-count').textContent = String(rows.length);
@@ -1814,7 +1807,7 @@
 
   function renderDispatchLeftList() {
     const list = $('#dispatch-list');
-    const rows = Utils.filterRows(APP_STATE.dispatch.availableOrders, APP_STATE.dispatch.search, ['external_id', 'branch_name', 'pvz_code', 'route_number']);
+    const rows = Utils.filterRows(APP_STATE.dispatch.availableOrders, APP_STATE.dispatch.search, ORDER_SEARCH_FIELDS);
     $('#dispatch-count').textContent = String(rows.length);
     const navDisp = $('#nav-badge-dispatch'); if (navDisp) navDisp.textContent = rows.length ? String(rows.length) : '';
     if (!rows.length) return renderEmpty(list, 'Нет заказов для отгрузки', '✅');
