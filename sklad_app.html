@@ -1603,13 +1603,14 @@
     const direct = label?.route_number ?? order?.route_number ?? order?.route;
     if (hasRoute(direct)) return direct;
 
-    const code = String(label?.pvz_code ?? order?.pvz_code ?? '').trim().toUpperCase();
+    const code = String(label?.pvz_code ?? order?.pvz_code ?? '').trim();
     if (!code) return null;
 
     try {
+      // ilike — регистронезависимое совпадение, как upper(btrim(...)) в SQL-триггере.
       const { data, error } = await db.from('pvz_locations')
         .select('route_number')
-        .eq('code', code)
+        .ilike('code', code)
         .not('route_number', 'is', null)
         .limit(1);
       if (!error && data && data.length && hasRoute(data[0].route_number)) return data[0].route_number;
