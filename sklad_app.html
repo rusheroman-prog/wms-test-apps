@@ -381,6 +381,32 @@
     }
     .inbound-log li b { color: var(--ok-text); }
 
+    /* ---------- Import (admin, Excel/CSV) ---------- */
+    .filebox {
+      border: 2px dashed var(--accent-line); border-radius: var(--r-lg);
+      padding: 22px; text-align: center; background: var(--accent-softer); cursor: pointer;
+      transition: border-color var(--speed) var(--ease), background var(--speed) var(--ease);
+    }
+    .filebox:hover, .filebox.dragover { border-color: var(--accent); background: var(--accent-soft); }
+    .filebox strong { display: block; font-size: 15px; margin-bottom: 4px; }
+    .small { font-size: 12.5px; color: var(--text-3); }
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 13.5px;
+    }
+    .switch-row:last-of-type { border-bottom: 0; }
+    .switch-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .import-log {
+      background: #0f172a; color: #bef264; padding: 14px; border-radius: var(--r-md);
+      font-family: var(--mono); font-size: 12px; height: 200px; overflow: auto; line-height: 1.5;
+    }
+    [data-theme="dark"] .import-log { background: #0b101b; border: 1px solid var(--border); }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 700; }
+    .tag.ok { background: var(--ok-soft); color: var(--ok-text); }
+    .tag.err { background: var(--danger-soft); color: var(--danger-text); }
+    #import-preview td { white-space: normal; }
+    #import-preview tr.err td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+
     /* ---------- Print history ---------- */
     .print-history-list { display: grid; gap: 8px; margin-top: 12px; }
     .print-history-row {
@@ -604,6 +630,7 @@
       <button class="nav-tab" role="tab" aria-selected="false" data-target="logs"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12.5" y2="16"/></svg> Журнал</button>
       <button class="nav-tab" role="tab" aria-selected="false" data-target="dashboard"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v15a1 1 0 0 0 1 1h15"/><path d="M7.5 14.5 11 10.5l3 2.5 4-5"/></svg> Мониторинг</button>
       <button class="nav-tab" role="tab" aria-selected="false" data-target="reports"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h7l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z"/><path d="M13 3.5V9h5"/><line x1="8" y1="13" x2="15" y2="13"/><line x1="8" y1="16.5" x2="12.5" y2="16.5"/></svg> Отчёты</button>
+      <button class="nav-tab" role="tab" aria-selected="false" data-target="import"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><line x1="12" y1="12" x2="12" y2="4"/><path d="M8.5 7.5 12 4l3.5 3.5"/></svg> Импорт</button>
     </div>
 
     <div id="user-info" class="user-info">
@@ -888,6 +915,56 @@
         </div>
       </div>
     </section>
+
+    <section id="view-import" class="view" role="tabpanel" aria-label="Импорт">
+      <div class="main-panel" style="width:100%;">
+        <div class="toolbar">
+          <div>
+            <h1 class="panel-title">Импорт заказов (Excel/CSV)</h1>
+            <p class="panel-subtitle">Загрузка файла напрямую в SQL через RPC import_orders_v2: валидация, агрегация qty, upsert заказов и позиций. Повторяет логику листа «Загрузка».</p>
+          </div>
+        </div>
+
+        <div class="page-card">
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="display:none;" />
+          <div class="filebox" id="import-filebox">
+            <strong>Выбрать файл или перетащить сюда</strong>
+            <span class="small" id="import-file-info">Поддерживаются .xlsx и .csv — первый лист считается источником данных</span>
+          </div>
+
+          <div style="margin-top:14px;">
+            <div class="switch-row"><span>Строгая проверка SKU по <b>sku_catalog</b></span><input id="import-strict-sku" type="checkbox" checked /></div>
+            <div class="switch-row"><span>Строгая проверка ПВЗ/филиала</span><input id="import-strict-pvz" type="checkbox" checked /></div>
+          </div>
+
+          <div class="table-actions" style="margin-top:14px;">
+            <button class="btn btn-outline" id="btn-import-check" disabled>Проверить</button>
+            <button class="btn btn-primary" id="btn-import-run" disabled>Импортировать в SQL</button>
+            <button class="btn btn-outline" id="btn-import-reset">Сбросить</button>
+          </div>
+          <p class="input-hint">Ожидаемые колонки: ID, Дата создания, Телефон, Позиции, Цвет, Размер, SKU, Название филиала, Сайт (регистр не важен). «Импортировать» активируется только после успешной проверки текущего файла.</p>
+        </div>
+
+        <div class="metrics-row" style="margin-top:14px;">
+          <div class="metric-card"><div class="metric-label">Строк файла</div><div class="metric-value" id="import-st-rows">0</div></div>
+          <div class="metric-card"><div class="metric-label">Заказов</div><div class="metric-value" id="import-st-orders">0</div></div>
+          <div class="metric-card"><div class="metric-label">Позиций</div><div class="metric-value" id="import-st-items">0</div></div>
+          <div class="metric-card"><div class="metric-label">Qty всего</div><div class="metric-value" id="import-st-qty">0</div></div>
+        </div>
+
+        <div class="data-table-wrap" id="import-preview" style="display:none;">
+          <table>
+            <thead><tr><th>Статус</th><th>ID</th><th>SKU</th><th>Qty</th><th>Товар</th><th>ПВЗ/филиал</th><th>Строки файла</th></tr></thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+
+        <div class="page-card" style="margin-top:14px;">
+          <div class="metric-label" style="margin-bottom:8px;">Журнал импорта</div>
+          <div class="import-log" id="import-log">Система готова...</div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -912,6 +989,9 @@
     LOG_LIMIT: 100,
     DETAILS_LIMIT: 2000,
     REPORT_LIMIT: 50000,
+    IMPORT_RPC: 'import_orders_v2',
+    IMPORT_PREVIEW_LIMIT: 120,
+    XLSX_CDN: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
     USE_STRONG_RPC_WHEN_AVAILABLE: true
   };
 
@@ -941,6 +1021,7 @@
       activeStatus: 'TOTAL',
       search: ''
     },
+    importer: { file: null, hash: null, rows: [], aggregated: [], checked: false },
     rpcAvailability: {}
   };
 
@@ -2183,6 +2264,239 @@
     }
   }
 
+  // ── IMPORT (админ: Excel/CSV → RPC import_orders_v2) ────────────────────
+  const IMPORT_ALIASES = {
+    external_id: ['id', 'id заказа', 'номер заказа', 'заказ', 'order id', 'order_id'],
+    order_date: ['дата создания', 'дата', 'created_at', 'date'],
+    phone: ['телефон', 'phone', 'номер телефона'],
+    item_name: ['позиции', 'товар', 'название', 'item', 'item_name'],
+    color: ['цвет', 'color'],
+    size: ['размер', 'size'],
+    sku: ['sku', 'артикул', 'штрихкод', 'barcode'],
+    branch_name: ['название филиала', 'филиал', 'пвз', 'адрес', 'branch', 'branch_name'],
+    site_source: ['сайт', 'site', 'source', 'site_source']
+  };
+
+  function importLog(msg, type = 'info') {
+    const el = $('#import-log');
+    const prefix = type === 'error' ? '❌' : type === 'ok' ? '✅' : type === 'warn' ? '⚠️' : '>';
+    el.innerHTML += `<br>${prefix} ${Utils.escapeHTML(msg)}`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // XLSX (~900 КБ) нужен только администратору — грузим лениво при первом файле.
+  let xlsxLoading = null;
+  function ensureXLSX() {
+    if (window.XLSX) return Promise.resolve();
+    if (!xlsxLoading) {
+      xlsxLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = CONFIG.XLSX_CDN;
+        s.onload = resolve;
+        s.onerror = () => { xlsxLoading = null; reject(new Error('Не удалось загрузить библиотеку XLSX')); };
+        document.head.appendChild(s);
+      });
+    }
+    return xlsxLoading;
+  }
+
+  const impClean = (s) => { const v = String(s ?? '').trim(); return v && v !== 'undefined' && v !== 'null' ? v : ''; };
+  const impNormKey = (s) => String(s ?? '').trim().toLowerCase().replace(/ё/g, 'е').replace(/[\s_\-]+/g, ' ');
+
+  function impParseDate(v) {
+    if (v == null || v === '') return '';
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'number' && v > 20000 && v < 80000) {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d, d.H || 0, d.M || 0, Math.floor(d.S || 0))).toISOString();
+    }
+    return String(v).trim();
+  }
+
+  async function impSha256(file) {
+    const buf = await file.arrayBuffer();
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function handleImportFile(file) {
+    const imp = APP_STATE.importer;
+    resetImportData();
+    imp.file = file;
+    $('#import-file-info').textContent = `Выбрано: ${file.name}`;
+    importLog(`Файл выбран: ${file.name}`);
+    Utils.setBusy(true, 'Чтение файла...');
+    try {
+      await ensureXLSX();
+      imp.hash = await impSha256(file);
+      importLog(`SHA-256: ${imp.hash.slice(0, 16)}...`);
+
+      const data = new Uint8Array(await file.arrayBuffer());
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      importLog(`Прочитано строк из первого листа: ${rawRows.length}`);
+
+      imp.rows = rawRows.map((row, idx) => {
+        // Карту нормализованных ключей строим один раз на строку.
+        const norm = {};
+        Object.keys(row).forEach(k => { norm[impNormKey(k)] = row[k]; });
+        const pick = (field) => {
+          for (const a of IMPORT_ALIASES[field]) {
+            const nk = impNormKey(a);
+            if (Object.prototype.hasOwnProperty.call(norm, nk)) return norm[nk];
+          }
+          return '';
+        };
+        return {
+          row_no: idx + 2,
+          external_id: impClean(pick('external_id')).replace(/\.0$/, ''),
+          order_date: impParseDate(pick('order_date')),
+          phone: impClean(pick('phone')).replace(/[^0-9+]/g, ''),
+          sku: impClean(pick('sku')).toUpperCase(),
+          item_name: impClean(pick('item_name')),
+          color: impClean(pick('color')),
+          size: impClean(pick('size')),
+          branch_name: impClean(pick('branch_name')),
+          site_source: impClean(pick('site_source')),
+          raw: row
+        };
+      }).filter(r => r.external_id || r.sku || r.phone || r.branch_name);
+
+      aggregateImportPreview();
+      renderImportPreview();
+    } catch (error) {
+      importLog(error.message, 'error');
+      Utils.showToast('Не удалось прочитать файл', 'error');
+    } finally {
+      Utils.setBusy(false);
+      updateImportButtons();
+    }
+  }
+
+  function aggregateImportPreview() {
+    const imp = APP_STATE.importer;
+    const map = new Map();
+    for (const r of imp.rows) {
+      if (!r.external_id && !r.sku) continue;
+      const key = `${r.external_id}|${r.sku}|${r.color}|${r.size}`;
+      if (!map.has(key)) map.set(key, { ...r, qty: 0, source_rows: [] });
+      const a = map.get(key);
+      a.qty += 1;
+      a.source_rows.push(r.row_no);
+      ['phone', 'order_date', 'item_name', 'branch_name', 'site_source'].forEach(f => { if (!a[f] && r[f]) a[f] = r[f]; });
+    }
+    imp.aggregated = [...map.values()];
+    const orders = new Set(imp.rows.map(r => r.external_id).filter(Boolean));
+    $('#import-st-rows').textContent = String(imp.rows.length);
+    $('#import-st-orders').textContent = String(orders.size);
+    $('#import-st-items').textContent = String(imp.aggregated.length);
+    $('#import-st-qty').textContent = String(imp.aggregated.reduce((s, r) => s + r.qty, 0));
+  }
+
+  function renderImportPreview(serverErrors = []) {
+    const imp = APP_STATE.importer;
+    const serverByRow = new Map(serverErrors.map(e => [String(e.row_no || ''), e]));
+    const rows = imp.aggregated.slice(0, CONFIG.IMPORT_PREVIEW_LIMIT);
+    $('#import-preview-body').innerHTML = rows.map(r => {
+      const issues = [];
+      if (!r.external_id) issues.push('нет ID');
+      if (!r.sku) issues.push('нет SKU');
+      if (!r.branch_name) issues.push('нет ПВЗ');
+      const server = r.source_rows.map(n => serverByRow.get(String(n))).find(Boolean);
+      const allIssues = [...issues, ...((server?.errors) || [])];
+      const tag = allIssues.length ? '<span class="tag err">Ошибка</span>' : '<span class="tag ok">OK</span>';
+      return `<tr class="${allIssues.length ? 'err' : ''}">
+        <td>${tag}${allIssues.length ? `<div class="small">${Utils.escapeHTML(allIssues.join('; '))}</div>` : ''}</td>
+        <td><b>${Utils.escapeHTML(r.external_id)}</b></td>
+        <td>${Utils.escapeHTML(r.sku)}</td>
+        <td><b>${r.qty}</b></td>
+        <td>${Utils.escapeHTML(r.item_name || '—')}<div class="small">${Utils.escapeHTML([r.size, r.color].filter(Boolean).join(' · '))}</div></td>
+        <td>${Utils.escapeHTML(r.branch_name || '—')}</td>
+        <td class="small">${Utils.escapeHTML(r.source_rows.join(', '))}</td>
+      </tr>`;
+    }).join('');
+    $('#import-preview').style.display = 'block';
+    if (imp.aggregated.length > CONFIG.IMPORT_PREVIEW_LIMIT) {
+      importLog(`В предпросмотре показано ${CONFIG.IMPORT_PREVIEW_LIMIT} из ${imp.aggregated.length} агрегированных позиций`, 'warn');
+    }
+  }
+
+  // «Импортировать» доступна только после успешной проверки ИМЕННО текущего
+  // разбора файла: любой новый файл/сброс/ошибка снимают checked.
+  function updateImportButtons() {
+    const imp = APP_STATE.importer;
+    $('#btn-import-check').disabled = !imp.rows.length;
+    $('#btn-import-run').disabled = !(imp.rows.length && imp.checked);
+  }
+
+  async function runImport(dryRun) {
+    const imp = APP_STATE.importer;
+    if (APP_STATE.busy) return;
+    if (!imp.rows.length) { Utils.showToast('Сначала выберите файл', 'warning'); return; }
+    if (!dryRun && !confirm('Импортировать данные в SQL? Повторная загрузка того же файла будет заблокирована по хэшу.')) return;
+    Utils.setBusy(true, dryRun ? 'Проверка файла на сервере...' : 'Импорт в SQL...');
+    try {
+      importLog(dryRun ? 'Запускаю проверку на сервере...' : 'Запускаю импорт в SQL...');
+      const payload = {
+        file_name: imp.file?.name || 'unknown',
+        file_hash: imp.hash,
+        strict_sku: $('#import-strict-sku').checked,
+        strict_pvz: $('#import-strict-pvz').checked,
+        rows: imp.rows
+      };
+      const { data, error } = await db.rpc(CONFIG.IMPORT_RPC, { p_payload: payload, p_dry_run: dryRun });
+      if (error) throw error;
+      if (!data) throw new Error('Пустой ответ RPC');
+
+      if (data.error_samples) renderImportPreview(data.error_samples);
+
+      if (!data.ok) {
+        imp.checked = false;
+        importLog(data.message || 'Сервер вернул ошибки', 'error');
+        if (data.batch_id) importLog(`Batch ID: ${data.batch_id}`);
+        if (data.error_samples?.length) importLog(`Ошибок строк: ${data.error_rows}. Проверьте таблицу предпросмотра.`, 'error');
+        return;
+      }
+
+      if (dryRun) {
+        imp.checked = true;
+        importLog(`Проверка успешна. Batch: ${data.batch_id}`, 'ok');
+        importLog(`К импорту: заказов ${data.orders_total}, позиций ${data.items_total}, валидных строк ${data.valid_rows}`, 'ok');
+        Utils.showToast('Проверка пройдена — импорт доступен', 'success');
+      } else {
+        imp.checked = false;
+        importLog(`Импорт завершён. Batch: ${data.batch_id}`, 'ok');
+        importLog(`Заказы: +${data.orders_inserted}, обновлено ${data.orders_updated}. Позиции: +${data.items_inserted}, обновлено ${data.items_updated}`, 'ok');
+        Utils.showToast('✅ Импорт завершён', 'success');
+      }
+    } catch (error) {
+      imp.checked = false;
+      importLog(error.message, 'error');
+      Utils.handleApiError(error, 'Ошибка импорта');
+    } finally {
+      Utils.setBusy(false);
+      updateImportButtons();
+    }
+  }
+
+  function resetImportData() {
+    const imp = APP_STATE.importer;
+    imp.rows = []; imp.aggregated = []; imp.hash = null; imp.checked = false;
+    ['rows', 'orders', 'items', 'qty'].forEach(k => { $(`#import-st-${k}`).textContent = '0'; });
+    $('#import-preview-body').innerHTML = '';
+    $('#import-preview').style.display = 'none';
+  }
+
+  function resetImportAll() {
+    APP_STATE.importer.file = null;
+    $('#import-file-input').value = '';
+    $('#import-file-info').textContent = 'Поддерживаются .xlsx и .csv — первый лист считается источником данных';
+    resetImportData();
+    updateImportButtons();
+    importLog('Форма сброшена');
+  }
+
   // ── HARDWARE SCANNER ─────────────────────────────────────────────────────
   class HardwareScanner {
     constructor(callback) {
@@ -2418,6 +2732,24 @@
 
     $('#btn-report-movements').addEventListener('click', exportStockMovements);
     $('#btn-report-orders').addEventListener('click', exportOrdersReport);
+
+    const filebox = $('#import-filebox');
+    filebox.addEventListener('click', () => $('#import-file-input').click());
+    filebox.addEventListener('dragover', (event) => { event.preventDefault(); filebox.classList.add('dragover'); });
+    filebox.addEventListener('dragleave', () => filebox.classList.remove('dragover'));
+    filebox.addEventListener('drop', (event) => {
+      event.preventDefault();
+      filebox.classList.remove('dragover');
+      const file = event.dataTransfer?.files?.[0];
+      if (file) handleImportFile(file);
+    });
+    $('#import-file-input').addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (file) handleImportFile(file);
+    });
+    $('#btn-import-check').addEventListener('click', () => runImport(true));
+    $('#btn-import-run').addEventListener('click', () => runImport(false));
+    $('#btn-import-reset').addEventListener('click', resetImportAll);
 
     $('#theme-toggle').addEventListener('click', toggleTheme);
   }
